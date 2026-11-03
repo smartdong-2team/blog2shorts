@@ -4,10 +4,15 @@
 블로그 URL 또는 본문을 입력하면 AI가 핵심 내용을 분석해 숏폼 대본과 장면을 만들고, 사용자가 장면을 수정한 뒤 9:16 세로형 MP4 영상으로 받아보는 웹서비스 MVP입니다. (미니인턴 과제)
 
 ```
-콘텐츠 입력 → AI 대본 생성 → 장면 편집 → TTS·자막 → 영상 합성 → 미리보기·다운로드
+① 컨텐츠 가져오기 → ② 대본 구상하기 → ③ 장면 → ④ 음성과 음악 → ⑤ 영상 제작
 ```
 
-> **현재는 프로젝트 초기 설정 단계입니다.** 위 흐름은 설계만 되어 있고, 구현된 기능은 백엔드 상태 확인 API와 프론트엔드 연결 확인 화면뿐입니다. → [현재 구현 상태](#현재-구현-상태)
+진행 방식은 두 가지입니다.
+
+- **장면 확인 후 만들기**: ①~③까지 만들고 멈춤 → 장면·목소리·배경음악을 확인/수정 → ④~⑤
+- **처음부터 끝까지 자동**: ①~⑤를 한 번에. 완성 후 장면을 고쳐 다시 만들 수 있음
+
+> **현재 프론트엔드는 목업 데이터로 전체 흐름이 동작합니다.** 백엔드는 상태 확인 API만 있고, 화면의 단계 처리는 `frontend/src/features/pipeline/mockApi.ts`의 가짜 응답(지연 포함)입니다. 완성 영상은 검은 9:16 화면으로 표시됩니다. → [현재 구현 상태](#현재-구현-상태)
 
 ## 기술 스택
 
@@ -42,10 +47,18 @@ blog2shorts/
 │   └── src/
 │       ├── api/                  # fetch 클라이언트, API 함수
 │       ├── components/
-│       │   ├── common/           # 공통 UI (Button, Card, Tabs, TextField, Stack, Grid, Text, StepCard, RoleBadge, StatusBadge)
-│       │   └── layout/           # PageLayout
-│       ├── features/             # 기능별 폴더 (content, script, editor, video) — 현재 README만
+│       │   ├── common/           # 공통 UI (Button, Card, Tabs, TextField, Stack, Grid, Text, StepCard, RoleBadge, StatusBadge,
+│       │   │                     #          SegmentedControl, Select, Range, SceneThumb, Dialog, VideoPlayer)
+│       │   └── layout/           # PageLayout, SplitLayout
+│       ├── features/
+│       │   ├── pipeline/         # 5단계 상태(useReducer)·진행 방식·목업 API
+│       │   ├── content/          # ① 입력 폼(진행 방식 토글 포함), 가져온 원문
+│       │   ├── script/           # ② 대본 요약
+│       │   ├── editor/           # ③ 장면 확인·수정, 이미지 선택
+│       │   ├── audio/            # ④ 목소리·배경음악 선택
+│       │   └── video/            # ⑤ 진행 상태 줄, 완성 영상
 │       ├── hooks/                # 공통 훅 (useHealthCheck)
+│       ├── utils/                # scroll 등 작은 도우미
 │       ├── pages/                # HomePage
 │       ├── styles/               # CSS 변수, 전역 스타일
 │       ├── types/                # API 타입
@@ -110,7 +123,7 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
-첫 화면의 "백엔드 연결 상태"가 **연결됨**이면 정상입니다. 백엔드가 꺼져 있으면 **연결 실패**가 표시되고 "다시 확인"으로 재시도할 수 있습니다.
+첫 화면의 "백엔드 연결 상태"가 **연결됨**이면 정상입니다. 백엔드가 꺼져 있으면 **연결 실패**가 표시되고 "다시 확인"으로 재시도할 수 있습니다. 백엔드 없이도 목업 흐름은 그대로 동작합니다("예시 글 넣기" → 시작 버튼).
 
 ## 환경변수
 
@@ -152,10 +165,11 @@ npm run lint       # oxlint
 |---|---|
 | 요구사항·설계 문서 (`docs/`) | 완료 |
 | Backend: FastAPI 앱, 설정, CORS, `GET /api/v1/health`, 테스트 4개 | 완료 |
-| Frontend: 디자인 시스템(토큰·공통 컴포넌트 10종), 홈 화면 뼈대(입력 탭·STEP 1~5·연결 상태), API 클라이언트 | 완료 |
+| Frontend: 디자인 시스템(토큰·공통 컴포넌트 16종 + 레이아웃 2종), API 클라이언트 | 완료 |
+| Frontend: 5단계 화면 흐름 + 진행 방식 토글(장면 확인 후 만들기 / 처음부터 끝까지 자동), 장면 편집, 목소리·배경음악 선택, 중지 | 완료 (목업 데이터) |
 | 콘텐츠 입력·네이버 블로그 추출 (FR-01) | 미구현 |
 | AI 대본 생성 (FR-02) | 미구현 |
-| 장면 편집 (FR-03) | 미구현 |
+| 장면 편집 (FR-03) | 프론트엔드 완료 (서버 저장 없음, 설계대로) |
 | TTS·자막 (FR-04) | 미구현 |
 | 영상 합성 (FR-05) | 미구현 |
 | 미리보기·다운로드 (FR-06) | 미구현 |

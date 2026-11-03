@@ -1,7 +1,6 @@
-# features/editor — 장면 구성 및 편집 (FR-03)
+# features/editor — ③ 장면 확인·수정 (FR-03)
 
-> 아직 구현되지 않음. 개발 계획 4단계에서 작성한다.
-
-- 장면 카드(역할·내레이션·자막·이미지), 문구 수정, 이미지 변경, 대체 배경
-- 장면 상태는 서버에 저장하지 않고 `useReducer`로 관리 (docs/architecture.md 2절)
-- 예정 파일: `SceneList.tsx`, `SceneCard.tsx`, `ImagePicker.tsx`, `scenesReducer.ts`
+- `SceneList.tsx`: 장면 확인 카드. 대본 요약, 예상 길이(목표 30~60초), 장면 목록, 장면 추가, 음성과 음악 설정, "영상 만들기" 버튼
+- `SceneCard.tsx`: 장면 한 개 — 썸네일(누르면 이미지 변경), 역할 배지, 화면 제목, 움직임, 나레이션, ↑↓·삭제·원문 위치 보기
+- `ImagePicker.tsx`: 블로그 이미지 / 내 컴퓨터 이미지(브라우저 임시 주소) / 이미지 없음 선택
+- 장면 상태는 서버에 저장하지 않고 `features/pipeline/pipelineReducer.ts`에서 관리 (docs/architecture.md 2절)

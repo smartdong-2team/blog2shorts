@@ -1,0 +1,30 @@
+.dialog {
+  width: min(640px, 92vw);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  color: var(--color-text);
+}
+
+.dialog::backdrop {
+  background: var(--color-backdrop);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-20);
+}
+
+.title {
+  font-size: var(--font-size-heading);
+  font-weight: 700;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-8);
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">
+  <rect width="960" height="640" fill="#e3d3c4"/>
+  <rect x="120" y="110" width="720" height="420" rx="18" fill="none" stroke="#5c4330" stroke-opacity=".35" stroke-width="4"/>
+  <line x1="120" y1="230" x2="840" y2="230" stroke="#5c4330" stroke-opacity=".25" stroke-width="4"/>
+  <text x="480" y="350" text-anchor="middle" font-family="-apple-system, 'Apple SD Gothic Neo', sans-serif" font-size="56" font-weight="700" fill="#5c4330">책 펼침면</text>
+  <text x="480" y="420" text-anchor="middle" font-family="-apple-system, 'Apple SD Gothic Neo', sans-serif" font-size="30" fill="#5c4330" fill-opacity=".6">예시 이미지 4</text>
+</svg>

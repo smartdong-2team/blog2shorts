@@ -1,7 +1,4 @@
-# features/script — AI 대본 생성 (FR-02)
+# features/script — ② 대본 구상하기 (FR-02)
 
-> 아직 구현되지 않음. 개발 계획 3단계에서 작성한다.
-
-- `POST /api/v1/scripts/generate` 호출, 로딩·오류·재시도 표시
-- 생성된 장면 목록을 editor 단계로 넘김
-- 예정 파일: `GenerateScriptButton.tsx`, `api.ts`, `types.ts`(Scene, Script)
+- `ScriptSummary.tsx`: 대본 주제와 핵심 포인트 표시 (장면 확인 카드 맨 위)
+- 데이터는 현재 `features/pipeline/mockApi.ts`의 `generateScript` (실제: `POST /api/v1/scripts/generate`의 `summary`)

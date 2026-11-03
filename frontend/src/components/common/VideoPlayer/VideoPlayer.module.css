@@ -1,0 +1,9 @@
+.frame {
+  display: block;
+  flex: none;
+  width: 300px;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--radius-xl);
+  background: var(--color-video);
+}

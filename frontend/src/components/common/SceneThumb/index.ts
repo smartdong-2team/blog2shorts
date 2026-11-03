@@ -1,0 +1,1 @@
+export { SceneThumb } from './SceneThumb'
