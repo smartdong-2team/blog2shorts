@@ -1,0 +1,58 @@
+.link {
+  color: inherit;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.paragraph {
+  font-size: var(--font-size-small);
+  line-height: 1.7;
+  color: var(--color-text-soft);
+}
+
+.figure {
+  position: relative;
+  margin: var(--space-6) 0;
+  overflow: hidden;
+  border: 3px solid transparent;
+  border-radius: var(--radius-lg);
+}
+
+.figure img {
+  display: block;
+  width: 100%;
+}
+
+.unused {
+  opacity: 0.55;
+}
+
+.highlight {
+  border-color: var(--color-warn);
+}
+
+.labels {
+  position: absolute;
+  top: var(--space-6);
+  left: var(--space-6);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.label {
+  padding: 2px var(--space-6);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--color-surface);
+  background: var(--color-overlay);
+  border-radius: var(--radius-sm);
+}
+
+.used {
+  background: var(--color-accent);
+}
