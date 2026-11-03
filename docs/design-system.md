@@ -1,6 +1,6 @@
 # 디자인 시스템 — Blog to Shorts
 
-> v0.1 (2026-11-03) · 프론트엔드 화면은 이 문서의 토큰과 공통 컴포넌트만으로 만든다.
+> v0.2 (2026-11-03) · 프론트엔드 화면은 이 문서의 토큰과 공통 컴포넌트만으로 만든다.
 > 구현 위치: 토큰 `frontend/src/styles/variables.css`, 컴포넌트 `frontend/src/components/common/`, 레이아웃 `frontend/src/components/layout/`
 
 ## 1. 기준과 원칙
@@ -34,6 +34,9 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 | `--color-warn` | `#c77a03` | 경고(예: 예상 길이 범위 밖) |
 | `--color-info` | `#5b5bd6` | 본문(BODY) 역할, 정보성 링크 |
 | `--color-media-placeholder` | `#22224a` | 이미지 없는 썸네일 배경 |
+| `--color-video` | `#000000` | 영상 영역 배경 |
+| `--color-overlay` | `rgb(0 0 0 / 55%)` | 이미지 위 글자 띠·라벨 배경 |
+| `--color-backdrop` | `rgb(0 0 0 / 40%)` | 모달 뒤 배경 |
 
 ### 2.2 타이포그래피
 
@@ -114,7 +117,7 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 
 ### Card
 - 용도: 화면의 구역(섹션). 데모의 `section`
-- props: `title?: string`, `actions?: ReactNode`(제목 오른쪽 버튼 영역), `children`
+- props: `title?: string`, `actions?: ReactNode`(제목 오른쪽 버튼 영역), `id?`(스크롤 이동 대상), `children`
 - 모양: 흰 배경, 1px `line` 테두리, radius 12, 안쪽 여백 18, 제목 16px/700
 
 ### Tabs
@@ -125,17 +128,18 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 
 ### TextField
 - 용도: 한 줄 입력 / 여러 줄 입력
-- props: `label?`(화면 표시), `ariaLabel?`(label 없을 때 필수), `multiline?`, `rows?`, `grow?`(가로 Stack에서 남은 너비 차지), `hint?`(아래 회색 안내), `error?`(아래 빨간 오류, 테두리 빨강), 기본 input/textarea 속성
+- props: `label?`(화면 표시), `ariaLabel?`(label 없을 때 필수), `multiline?`, `rows?`(주면 그 줄 수, 없으면 최소 높이 160px), `grow?`(가로 Stack에서 남은 너비 차지), `hint?`(아래 회색 안내), `error?`(아래 빨간 오류, 테두리 빨강), 기본 input/textarea 속성
 - 모양: 흰 배경, 1px `line`, radius 10, 15px, 안쪽 10×12
 
 ### StepCard
-- 용도: 처리 단계 진행 표시 (STEP 1~5)
+- 용도: 처리 단계 진행 표시 (STEP 1~5: 컨텐츠 가져오기 · 대본 구상하기 · 장면 · 음성과 음악 · 영상 제작)
 - props: `step: number`, `title: string`, `message: string`, `status: StepStatus`, `meta?: string`(소요 시간·비용 줄)
 - 상태 표현
   | status | 배경 / 테두리 | 표시 |
   |---|---|---|
   | `idle` | 흰색 / `line` | 메시지 회색 |
   | `running` | 흰색 / `accent` | STEP 번호 옆 그린 스피너 |
+  | `waiting` | 흰색 / `text` 2px | 메시지 검정 600 — 사용자 확인을 기다리는 단계 (검토 모드의 STEP 4) |
   | `done` | `accent-bg` / `accent-line` | STEP 번호 옆 ✓ |
   | `error` | `danger-bg` / `danger-line` | 메시지 빨강 |
   | `cancelled` | `subtle` / `line` | 메시지 회색 |
@@ -149,6 +153,42 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 - 용도: 연결·작업 상태를 알약 모양으로 표시
 - props: `tone: 'success'|'danger'|'neutral'`, `label: string`
 
+### SegmentedControl
+- 용도: 둘 이상 중 하나 고르기 (진행 방식: 장면 확인 후 만들기 / 처음부터 끝까지 자동)
+- props: `items: { value; label }[]`, `value`, `onChange(value)`, `ariaLabel`, `disabled?`
+- 모양: 회색 트랙 안에 붙은 버튼, 선택 항목은 검정 배경·흰 글자. 따로 떨어진 `Tabs`와 구분된다
+- 규칙: `role="radiogroup"`/`role="radio"`, 키보드 ←/→ 이동. 진행 중에는 `disabled`
+
+### Select
+- 용도: 목록에서 하나 고르기 (장면 움직임, 목소리, 배경음악)
+- props: `options: { value; label }[]`, `label?`, `ariaLabel?`(label 없을 때 필수), 기본 select 속성
+- 모양: `TextField`와 같은 테두리·크기
+
+### Range
+- 용도: 숫자 값 슬라이더 (음악 크기)
+- props: `label`, `value: number`, `unit?`(예: `%`), 기본 range input 속성(min·max·step 등)
+- 모양: 라벨 왼쪽, 현재 값 오른쪽(tabular-nums), 슬라이더 색은 `text`
+
+### SceneThumb
+- 용도: 장면 이미지 썸네일 + 이미지 변경 버튼
+- props: `src: string | null`, `label?`(기본 "이미지 변경"), `onClick?`, `disabled?`
+- 모양: 9:16, 가로 120px, radius 8. 이미지 없으면 `media-placeholder` 배경에 "이미지 없음", 하단 `overlay` 띠
+
+### Dialog
+- 용도: 모달 (장면 이미지 선택)
+- props: `open`, `title`, `onClose`, `footer?`, `children`
+- 규칙: `<dialog>` + `showModal()`. Esc·바깥 클릭으로 닫힌다. 브라우저 `alert/confirm`은 쓰지 않는다
+
+### VideoPlayer
+- 용도: 9:16 세로 영상 자리
+- props: `src: string | null`, `label`(스크린리더용)
+- 모양: 가로 300px(좁으면 100%), radius 12, `video` 배경. `src`가 없으면 검은 화면만 (백엔드 연결 전)
+
+### SplitLayout (`components/layout/SplitLayout`)
+- 용도: [보조 패널 | 본문] 2열 (원문 | 장면 확인)
+- props: `aside`, `asideVisible`, `children`
+- 모양: 1 : 1.35 비율, 보조 패널은 화면에 붙어 따라오며(sticky) 따로 스크롤. 900px 이하에서는 위아래로 쌓인다
+
 ## 4. 사용 규칙
 
 1. `pages/`·`features/` 코드에는 **색 값(hex)·px·인라인 style을 쓰지 않는다.** 필요한 표현은 컴포넌트 props로 한다.
@@ -158,16 +198,26 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 5. 새 색·크기가 필요하면 먼저 2절에 토큰을 추가한 뒤 쓴다.
 6. 접근성: 버튼은 `<button>`, 입력에는 label 또는 `ariaLabel`, 탭은 `role="tablist"`/`aria-selected`, 상태 배지는 `role="status"`.
 
-## 5. 화면 구성 (데모 기준 배치)
+## 5. 화면 구성 (`pages/HomePage.tsx`)
 
 ```
 PageLayout  "블로그 → 숏폼 영상" + 부제
-├── Card      입력: Tabs(블로그 URL | 본문 붙여넣기) + TextField + Button(primary "분석하기")
-├── Grid(5)   StepCard × 5  글 읽기 · 이미지 수집 · 대본 작성 · 음성(TTS) · 영상 합성
-├── Card      장면 편집: [원문 | 장면 목록] (RoleBadge, SceneThumb, TextField)   ← 4단계에서 구현
-├── Card      완성 영상: VideoPlayer + 다운로드                                ← 7단계에서 구현
-└── Card      백엔드 연결 상태 (개발 확인용)
+├── Card         입력: Tabs(블로그 URL | 본문 붙여넣기) + TextField + Button(primary)
+│                진행 방식 SegmentedControl(장면 확인 후 만들기 | 처음부터 끝까지 자동) + 안내 문구
+├── RenderStatus 지금 하는 일·경과 시간 + Button(danger "중지하기")
+├── Grid(5)      StepCard × 5  컨텐츠 가져오기 · 대본 구상하기 · 장면 · 음성과 음악 · 영상 제작
+├── SplitLayout  [가져온 컨텐츠(원문·이미지) | 장면 확인]
+│                장면 확인 = 대본 요약 + SceneCard × 4~6 + 음성과 음악(Select·Range) + Button(primary "영상 만들기")
+├── Card         완성 영상: VideoPlayer(검은 9:16) + 요약 + 장면 다시 수정하기
+└── Card         백엔드 연결 상태 (개발 확인용)
 ```
+
+진행 방식
+
+| 방식 | 흐름 | 시작 버튼 |
+|---|---|---|
+| 장면 확인 후 만들기 (기본) | 1~3단계 → 멈춤(STEP 4 `waiting`) → 장면·음성 확인 → "영상 만들기" → 4~5단계 | 장면까지 만들기 |
+| 처음부터 끝까지 자동 | 1~5단계를 멈추지 않고 진행. 완성 후 장면을 고쳐 "영상 다시 만들기"(4~5단계만) | 영상까지 만들기 |
 
 ## 6. 추가 예정 컴포넌트
 
@@ -175,7 +225,4 @@ PageLayout  "블로그 → 숏폼 영상" + 부제
 
 | 컴포넌트 | 단계 | 내용 |
 |---|---|---|
-| `SceneThumb` | 4 | 9:16 썸네일(가로 120px), 이미지 없으면 `media-placeholder` 배경, 하단 "이미지 변경" 띠 |
-| `Dialog` | 4 | 이미지 선택 모달 (`<dialog>` 기반) |
-| `VideoPlayer` | 7 | 9:16 비디오(가로 300px), 검정 배경, radius 12 |
 | `LogItem` | 선택 | 단계별 요청·결과 로그 한 줄 + 펼치기 |
