@@ -1,0 +1,20 @@
+[project]
+name = "blog2shorts-backend"
+version = "0.1.0"
+description = "Blog to Shorts API server (FastAPI)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.162.0",
+    "pydantic-settings>=2.16.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16.0",
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
