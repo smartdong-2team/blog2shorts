@@ -1,0 +1,31 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-12);
+  border-radius: 999px;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.success {
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+.danger {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.neutral {
+  color: var(--color-text-muted);
+  background: var(--color-subtle);
+}

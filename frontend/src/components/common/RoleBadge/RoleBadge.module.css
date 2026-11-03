@@ -1,0 +1,12 @@
+.badge {
+  flex: none;
+  padding: 3px var(--space-8);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-micro);
+  font-weight: 800;
+  color: var(--color-surface);
+}
+
+.hook { background: var(--color-danger); }
+.body { background: var(--color-info); }
+.cta { background: var(--color-accent); }

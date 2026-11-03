@@ -1,0 +1,69 @@
+.card {
+  padding: var(--space-12);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+}
+
+.title {
+  margin: 3px 0 var(--space-6);
+  font-size: var(--font-size-small);
+  font-weight: 700;
+}
+
+.message {
+  min-height: 32px;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.meta {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.spinner {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--color-accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin var(--duration-spin) linear infinite;
+}
+
+.check {
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.running {
+  border-color: var(--color-accent);
+}
+
+.done {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-line);
+}
+
+.error {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-line);
+}
+
+.error .message {
+  color: var(--color-danger);
+}
+
+.cancelled {
+  background: var(--color-subtle);
+}

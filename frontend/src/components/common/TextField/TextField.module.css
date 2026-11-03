@@ -1,0 +1,61 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.grow {
+  flex: 1;
+}
+
+.label {
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}
+
+.field {
+  width: 100%;
+  padding: var(--space-10) var(--space-12);
+  font: inherit;
+  font-size: var(--font-size-body);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+
+textarea.field {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.field::placeholder {
+  color: var(--color-text-muted);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+.field:disabled {
+  background: var(--color-subtle);
+}
+
+.invalid {
+  border-color: var(--color-danger);
+}
+
+.hint,
+.error {
+  font-size: var(--font-size-caption);
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+}
