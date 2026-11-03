@@ -1,0 +1,26 @@
+.tabs {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.tab {
+  padding: var(--space-10) var(--space-18);
+  border: 0;
+  border-radius: var(--radius-lg);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-subtle);
+  cursor: pointer;
+}
+
+.selected {
+  color: var(--color-surface);
+  background: var(--color-text);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}

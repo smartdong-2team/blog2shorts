@@ -1,0 +1,45 @@
+.button {
+  flex: none;
+  padding: var(--space-10) var(--space-18);
+  border: 0;
+  border-radius: var(--radius-lg);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.primary {
+  color: var(--color-surface);
+  background: var(--color-accent);
+}
+
+.ghost {
+  color: var(--color-text);
+  background: var(--color-subtle);
+  font-weight: 500;
+}
+
+.icon {
+  padding: var(--space-6) var(--space-10);
+  color: var(--color-text);
+  background: var(--color-subtle);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+.danger {
+  color: var(--color-surface);
+  background: var(--color-danger);
+}
