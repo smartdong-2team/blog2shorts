@@ -1,0 +1,40 @@
+import type { Motion, Scene } from './types'
+
+export const MIN_SCENES = 4
+export const MAX_SCENES = 6
+export const TARGET_MIN_SEC = 30
+export const TARGET_MAX_SEC = 60
+
+export const MOTION_OPTIONS: { value: Motion; label: string }[] = [
+  { value: 'zoom_in', label: '확대' },
+  { value: 'zoom_out', label: '축소' },
+  { value: 'pan_left', label: '왼쪽 이동' },
+  { value: 'pan_right', label: '오른쪽 이동' },
+]
+
+let seq = 0
+export const newSceneId = () => `scene-${Date.now().toString(36)}-${++seq}`
+
+const chars = (s: string) => s.replace(/\s/g, '').length
+
+/** 장면 한 개 나레이션 길이(초): 한국어 TTS 약 5.2자/초 */
+export const narrationSec = (narration: string) => chars(narration) / 5.2
+
+/** 전체 예상 길이(초): 말하는 시간 + 장면 여유 0.6초 − 전환 겹침 0.5초 (데모와 같은 공식) */
+export function estimateSec(scenes: Scene[]) {
+  const n = scenes.length
+  if (n === 0) return 0
+  const talk = scenes.reduce((sum, s) => sum + narrationSec(s.narration), 0)
+  return talk + n * 0.6 - (n - 1) * 0.5
+}
+
+/** 첫 장면 HOOK, 마지막 CTA, 나머지 본문 */
+export function assignRoles(scenes: Scene[]): Scene[] {
+  return scenes.map((s, i) => ({ ...s, role: i === 0 ? 'hook' : i === scenes.length - 1 ? 'cta' : 'body' }))
+}
+
+/** 초 → "38초" / "1분 2초" */
+export function formatSec(sec: number) {
+  const s = Math.round(sec)
+  return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`
+}
