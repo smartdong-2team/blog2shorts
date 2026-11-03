@@ -17,6 +17,9 @@
   --color-warn: #c77a03;
   --color-info: #5b5bd6;
   --color-media-placeholder: #22224a;
+  --color-video: #000000;
+  --color-overlay: rgb(0 0 0 / 55%);
+  --color-backdrop: rgb(0 0 0 / 40%);
 
   /* 타이포그래피 */
   --font-sans: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;

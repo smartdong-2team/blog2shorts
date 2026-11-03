@@ -26,8 +26,12 @@
 }
 
 textarea.field {
-  min-height: 160px;
   resize: vertical;
+}
+
+/* rows를 주지 않은 여러 줄 입력은 본문 붙여넣기 크기 */
+textarea.tall {
+  min-height: 160px;
 }
 
 .field::placeholder {

@@ -6,11 +6,13 @@ interface CardProps {
   /** 제목 오른쪽에 놓을 버튼 등 */
   actions?: ReactNode
   children: ReactNode
+  /** 스크롤 이동 대상으로 쓸 때 */
+  id?: string
 }
 
-export function Card({ title, actions, children }: CardProps) {
+export function Card({ title, actions, children, id }: CardProps) {
   return (
-    <section className={styles.card}>
+    <section id={id} className={styles.card}>
       {(title || actions) && (
         <div className={styles.head}>
           {title && <h2 className={styles.title}>{title}</h2>}

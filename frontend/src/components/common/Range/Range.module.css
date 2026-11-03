@@ -1,0 +1,32 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.label {
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}
+
+.value {
+  font-size: var(--font-size-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-soft);
+}
+
+.input {
+  width: 100%;
+  accent-color: var(--color-text);
+}
+
+.input:disabled {
+  opacity: var(--opacity-disabled);
+}

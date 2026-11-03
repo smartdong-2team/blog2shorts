@@ -50,6 +50,16 @@
   border-color: var(--color-accent);
 }
 
+.waiting {
+  border-color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.waiting .message {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 .done {
   background: var(--color-accent-bg);
   border-color: var(--color-accent-line);

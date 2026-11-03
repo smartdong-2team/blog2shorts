@@ -34,7 +34,8 @@ export function TextField(props: TextFieldProps) {
   let control
   if (rest.multiline) {
     const { multiline: _multiline, ...textareaProps } = rest
-    control = <textarea {...textareaProps} {...common} />
+    const className = textareaProps.rows ? common.className : `${common.className} ${styles.tall}`
+    control = <textarea {...textareaProps} {...common} className={className} />
   } else {
     const { multiline: _multiline, ...inputProps } = rest
     control = <input {...inputProps} {...common} />

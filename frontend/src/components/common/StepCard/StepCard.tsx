@@ -1,10 +1,11 @@
 import styles from './StepCard.module.css'
 
-export type StepStatus = 'idle' | 'running' | 'done' | 'error' | 'cancelled'
+export type StepStatus = 'idle' | 'running' | 'waiting' | 'done' | 'error' | 'cancelled'
 
 const STATUS_LABEL: Record<StepStatus, string> = {
   idle: '대기',
   running: '진행 중',
+  waiting: '확인 대기',
   done: '완료',
   error: '실패',
   cancelled: '중지됨',
