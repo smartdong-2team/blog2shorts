@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { audioSummary } from '../audio/options'
+import { checkVideoReady, videoDownloadUrl } from '../../api/videos'
 
 // 스크립트 생성을 위한 백엔드 API 연결
 import { generateScript } from '../../api/scripts'
@@ -111,6 +111,11 @@ export function usePipeline() {
     )
 
     console.log('영상 생성 작업:', result)
+    // 생성된 영상의 작업 ID 저장
+    dispatch({
+      type: 'videoQueued',
+      jobId: result.job_id,
+    })
 
     // 202는 작업 접수이므로 아직 rendered 액션을 호출하지 않음
   }
@@ -192,6 +197,34 @@ export function usePipeline() {
     }
   }
 
+  const checkResult = async () => {
+    const { jobId, scenes, audio } = stateRef.current
+
+    if (!jobId) return
+
+    try {
+      const ready = await checkVideoReady(jobId)
+
+      if (!ready) {
+        alert('아직 영상을 제작하고 있어. 잠시 후 다시 확인해 줘.')
+        return
+      }
+
+      dispatch({
+        type: 'rendered',
+        result: {
+          duration_sec: 0,
+          width: 1080,
+          height: 1920,
+          download_url: videoDownloadUrl(jobId),
+        },
+        renderedWith: renderKey(scenes, audio),
+      })
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '영상 확인에 실패했어.')
+    }
+  }
+
   const cancel = () => abortRef.current?.abort()
 
   /** 단계 카드 아래 경과 시간 */
@@ -203,5 +236,5 @@ export function usePipeline() {
 
   const stale = state.result != null && state.renderedWith !== renderKey(state.scenes, state.audio)
 
-  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale }
+  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale,checkResult }
 }

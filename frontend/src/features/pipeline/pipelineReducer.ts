@@ -34,6 +34,7 @@ export interface PipelineState {
   result: RenderResult | null
   /** 마지막 렌더에 쓴 장면·음성 설정. 지금 값과 다르면 "다시 만들기" 안내 */
   renderedWith: string | null
+  jobId: string | null
 }
 
 export type PipelineAction =
@@ -55,6 +56,7 @@ export type PipelineAction =
   | { type: 'removeScene'; index: number }
   | { type: 'addImage'; image: ContentImage; sceneIndex: number }
   | { type: 'audio'; patch: Partial<AudioSettings> }
+  | { type: 'videoQueued'; jobId: string }
 
 const idleSteps = (): Record<StepId, StepState> => ({
   1: { status: 'idle', message: '본문·이미지 대기' },
@@ -74,6 +76,7 @@ export const initialPipeline: PipelineState = {
   audio: DEFAULT_AUDIO,
   result: null,
   renderedWith: null,
+  jobId: null,
 }
 
 /** 렌더 입력(장면·음성 설정)을 비교용 문자열로 */
@@ -96,7 +99,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       if (action.phase === 'analyzing') return { ...initialPipeline, mode: state.mode, audio: state.audio, phase: 'analyzing' }
       // 4~5단계만 다시: 이전 결과를 지우고 두 단계를 대기로
       const steps = { ...state.steps, 4: idleSteps()[4], 5: idleSteps()[5] }
-      return { ...state, phase: 'rendering', steps, result: null }
+      return { ...state, phase: 'rendering', steps, result: null,jobId: null, }
     }
 
     case 'stepStart':
@@ -140,12 +143,18 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         ...state,
         scenes: state.scenes.map((s, i) => (i === action.index ? { ...s, ...action.patch } : s)),
       }
+    case 'videoQueued':
+      return {
+        ...state,
+        jobId: action.jobId,
+        phase: 'review',
+      }
 
     case 'moveScene': {
       const to = action.index + action.delta
       if (to < 0 || to >= state.scenes.length) return state
       const scenes = [...state.scenes]
-      ;[scenes[action.index], scenes[to]] = [scenes[to], scenes[action.index]]
+        ;[scenes[action.index], scenes[to]] = [scenes[to], scenes[action.index]]
       return { ...state, scenes: assignRoles(scenes) }
     }
 
