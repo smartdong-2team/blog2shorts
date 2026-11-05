@@ -4,8 +4,8 @@
 import logging
 from pydantic import ValidationError
 from openai import AsyncOpenAI, APIConnectionError, APITimeoutError, InternalServerError
-
 from app.core.config import get_settings
+from app.core.openai import get_openai_client
 from app.schemas.script import (
     ScriptAIOutput,
     ScriptOutputFormat,
@@ -27,22 +27,7 @@ class ScriptGenerationError(Exception):
 # --------------------------------------------------
 # 1. OpenAI 클라이언트 생성 
 # --------------------------------------------------
-def get_openai_client() -> AsyncOpenAI:
-    """설정된 API 키로 OpenAI 비동기 클라이언트를 생성한다."""
-
-    settings = get_settings()
-
-    if (
-        settings.openai_api_key is None
-        or not settings.openai_api_key.get_secret_value()
-    ):
-        raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
-
-    # SDK 자체의 자동 재시도는 끄고 서비스에서 관리한다.
-    return AsyncOpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        max_retries=0,
-    )
+# core -> openai.py로 이동
 
 # --------------------------------------------------
 # 2. 이미지 ID 검증
