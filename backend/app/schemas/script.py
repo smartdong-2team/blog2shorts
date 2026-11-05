@@ -183,7 +183,32 @@ class ScriptAIOutput(BaseModel):
 
 
 # --------------------------------------------------
-# 4. 최종 API 응답 스키마
+# 4. OpenAI Structured Outputs용 스키마
+# OpenAI가 써주는 JSON 구조를 검증하기 위해 별도 스키마를 정의한다.
+# --------------------------------------------------
+class ScriptOutputScene(BaseModel):
+    """OpenAI가 생성할 장면의 기본 구조."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    order: int
+    role: Literal["hook", "body", "cta"]
+    narration: str
+    caption: str
+    asset_id: str | None
+
+
+class ScriptOutputFormat(BaseModel):
+    """OpenAI Structured Outputs용 응답 스키마."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: ScriptSummary
+    scenes: list[ScriptOutputScene]
+
+
+# --------------------------------------------------
+# 5. 최종 API 응답 스키마
 # --------------------------------------------------
 
 class ScriptGenerateResponse(ScriptAIOutput):
