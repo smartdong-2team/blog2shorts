@@ -63,7 +63,7 @@
 
 - 오류: 서버가 내려가 있으면 네트워크 오류(프론트엔드에서 "연결 실패" 표시)
 
-## 2. `POST /api/v1/content/extract`
+## 2. `POST /api/v1/content/extract` - 구현됨 (feat/content-extraction 브랜치)
 
 - 목적: 허용된 네이버 블로그 글 URL에서 제목·본문 텍스트·이미지를 추출
 - Request
@@ -88,14 +88,14 @@
 - 오류: `400 UNSUPPORTED_URL`, `422 VALIDATION_ERROR`, `422 EXTRACTION_FAILED`, `502 UPSTREAM_ERROR`
 - 비고: 이미지 다운로드 일부가 실패해도 본문 추출이 성공하면 `200`(성공한 이미지만 반환). 본문을 직접 입력하는 경우 이 API를 호출하지 않는다.
 
-## 3. `GET /api/v1/assets/{asset_id}`
+## 3. `GET /api/v1/assets/{asset_id}` - 구현됨 (feat/content-extraction 브랜치)
 
 - 목적: 추출 단계에서 서버에 저장한 이미지를 브라우저에 제공
 - Request: path `asset_id`(UUID)
 - Response `200`: 이미지 바이너리 (`image/jpeg` | `image/png` | `image/webp`)
 - 오류: `404 NOT_FOUND`(없음·만료), `422 VALIDATION_ERROR`(UUID 형식 아님)
 
-## 4. `POST /api/v1/scripts/generate`
+## 4. `POST /api/v1/scripts/generate` - 구현됨 (feat/script-generate 브랜치)
 
 - 목적: 콘텐츠를 분석해 30~60초 숏폼 대본과 4~6개 장면 생성
 - Request
@@ -145,7 +145,7 @@
 
 - 오류: `422 VALIDATION_ERROR`, `502 AI_GENERATION_FAILED`(OpenAI 오류·거절·스키마 위반 — 서버 내부 1회 재시도 후)
 
-## 5. `POST /api/v1/videos`
+## 5. `POST /api/v1/videos` 구현예정
 
 - 목적: 편집된 장면으로 TTS·자막·영상 합성 작업을 시작
 - Request
