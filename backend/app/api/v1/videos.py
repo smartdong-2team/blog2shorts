@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
+from fastapi.responses import FileResponse
 
 from app.schemas.video import VideoCreateRequest
 from app.services.video_pipeline import generate_video
@@ -101,4 +102,38 @@ async def create_video(
         job_id=job_id,
         status="queued",
         status_url=f"/api/v1/videos/{job_id}",
+    )
+
+
+
+# 영상 생성 상태 조회 API
+@router.get("/{job_id}/download")
+async def download_video(job_id: str):
+    job = video_jobs.get(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="영상 작업을 찾을 수 없습니다.",
+        )
+
+    if job["status"] != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail="영상 생성이 아직 완료되지 않았습니다.",
+        )
+
+    output_path = Path(job["output_path"])
+
+    if not output_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="영상 파일을 찾을 수 없습니다.",
+        )
+
+    return FileResponse(
+        path=output_path,
+        media_type="video/mp4",
+        filename=f"{job_id}.mp4",
+        content_disposition_type="inline",
     )
