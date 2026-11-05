@@ -12,3 +12,60 @@ export interface ApiErrorBody {
     details?: unknown
   }
 }
+
+
+export interface ScriptImage {
+  asset_id: string
+  alt: string | null
+}
+
+export interface ScriptGenerateRequest {
+  title?: string | null
+  text: string
+  images?: ScriptImage[]
+  target_duration_sec?: number
+}
+
+export interface ScriptSummary {
+  topic: string
+  key_points: string[]
+}
+
+export type ScriptSceneRole = 'hook' | 'body' | 'cta'
+
+export interface ScriptScene {
+  order: number
+  role: ScriptSceneRole
+  narration: string
+  caption: string
+  asset_id: string | null
+}
+
+export interface ScriptGenerateResponse {
+  summary: ScriptSummary
+  scenes: ScriptScene[]
+  estimated_duration_sec: number
+}
+
+
+export interface ContentExtractRequest {
+  url: string
+}
+
+export interface ContentExtractResponse {
+  source: {
+    platform: string
+    blog_id: string
+    log_no: string
+    url: string
+  }
+  title: string
+  text: string
+  images: {
+    asset_id: string
+    url: string
+    width: number
+    height: number
+    alt: string | null
+  }[]
+}

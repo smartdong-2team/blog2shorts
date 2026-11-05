@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { audioSummary } from '../audio/options'
-import { buildScenes, extractContent, generateScript, renderVideo, synthesizeAudio } from './mockApi'
+
+import { generateScript } from '../../api/scripts'
+import {
+  extractContent,
+  renderVideo,
+  synthesizeAudio,
+} from './mockApi'
+import { toPipelineScenes } from './scriptAdapter'
+
 import { initialPipeline, pipelineReducer, renderKey } from './pipelineReducer'
 import { assignRoles, estimateSec, formatSec } from './scenes'
 import type { AudioSettings, ContentInput, Scene, StepId } from './types'
@@ -9,7 +17,7 @@ const imageCount = (text: string) => (text.match(/\[이미지 \d+\]/g) ?? []).le
 const bodyChars = (text: string) => text.replace(/\[이미지 \d+\]/g, '').replace(/\s/g, '').length
 
 /** 실패한 단계를 이미 표시했다는 표시 (바깥 catch에서 다시 처리하지 않도록) */
-class StepFailed extends Error {}
+class StepFailed extends Error { }
 
 /** 진행 중일 때만 0.5초마다 갱신되는 현재 시각 (경과 시간 표시용) */
 function useNow(active: boolean) {
@@ -93,22 +101,47 @@ export function usePipeline() {
         (c) => `본문 ${bodyChars(c.text).toLocaleString()}자 · 이미지 ${imageCount(c.text) || c.images.length}장`,
       )
       dispatch({ type: 'content', content })
+      console.log('백엔드에 전달할 콘텐츠:', content)
 
-      const summary = await step(
+
+      // 2~3단계: 대본 생성 + 장면 구성
+      const generated = await step(
         2,
-        '핵심 내용 뽑는 중',
-        () => generateScript(content, signal),
-        (s) => `핵심 포인트 ${s.key_points.length}개`,
+        '대본과 장면 생성 중',
+        () =>
+          generateScript(
+            {
+              title: content.title,
+              text: content.text,
+              images: content.images.map((image) => ({
+                asset_id: image.asset_id,
+                alt: image.alt,
+              })),
+              target_duration_sec: 45,
+            },
+            signal,
+          ),
+        (result) => `핵심 포인트 ${result.summary.key_points.length}개`,
       )
-      dispatch({ type: 'summary', summary })
+
+      dispatch({ type: 'summary', summary: generated.summary })
 
       const scenes = await step(
         3,
-        'HOOK·본문·CTA 나누는 중',
-        () => buildScenes(content, summary, signal),
-        (list) => `장면 ${list.length}개 · 약 ${formatSec(estimateSec(list))}`,
+        '장면 구성 중',
+        async () => toPipelineScenes(generated),
+        (list) =>
+          `장면 ${list.length}개 · 약 ${formatSec(estimateSec(list))}`,
       )
+
       dispatch({ type: 'scenes', scenes })
+      console.log('이미지 개수:', content.images.length)
+      console.log('첫 번째 이미지:', content.images[0])
+      console.log(
+        '본문 이미지 위치:',
+        content.text.match(/\[이미지 \d+\]/g),
+      )
+
 
       if (mode === 'review') {
         dispatch({ type: 'waitReview' })
