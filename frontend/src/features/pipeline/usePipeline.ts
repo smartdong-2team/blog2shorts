@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { audioSummary } from '../audio/options'
+import { checkVideoReady, videoDownloadUrl } from '../../api/videos'
 
+// 스크립트 생성을 위한 백엔드 API 연결
 import { generateScript } from '../../api/scripts'
-import {
-  extractContent,
-  renderVideo,
-  synthesizeAudio,
-} from './mockApi'
+
+// 비디오 생성을 하는 백엔드 api 연결
+import { createVideo } from '../../api/videos'
+
+import { extractContent, } from './mockApi'
 import { toPipelineScenes } from './scriptAdapter'
 
 import { initialPipeline, pipelineReducer, renderKey } from './pipelineReducer'
@@ -77,17 +78,47 @@ export function usePipeline() {
   }
 
   // 4~5단계
-  const runRender = async (scenes: Scene[], audio: AudioSettings, signal: AbortSignal) => {
-    await step(4, '목소리·음악 입히는 중', () => synthesizeAudio(scenes, audio, signal), () => audioSummary(audio))
+  const runRender = async (
+    scenes: Scene[],
+    audio: AudioSettings,
+    signal: AbortSignal,
+  ) => {
+    const missingImage = scenes.findIndex((scene) => !scene.asset_id)
+
+    if (missingImage !== -1) {
+      throw new Error(
+        `${missingImage + 1}번 장면에 이미지가 지정되지 않았어.`,
+      )
+    }
+
+    const request = {
+      scenes: scenes.map((scene, index) => ({
+        order: index + 1,
+        role: scene.role,
+        narration: scene.narration,
+        caption: scene.caption,
+        asset_id: scene.asset_id!,
+      })),
+      voice: null,
+    }
+
+    // 실제 백엔드는 음성 생성과 영상 렌더링을 하나의 작업으로 처리
     const result = await step(
       5,
-      '장면 이어 붙이는 중',
-      () => renderVideo(scenes, signal),
-      (r) => `약 ${formatSec(r.duration_sec)} · ${r.width}×${r.height}`,
+      '영상 생성 요청 중',
+      () => createVideo(request, signal),
+      (response) => `영상 생성 요청 접수 · ${response.job_id}`,
     )
-    dispatch({ type: 'rendered', result, renderedWith: renderKey(scenes, audio) })
-  }
 
+    console.log('영상 생성 작업:', result)
+    // 생성된 영상의 작업 ID 저장
+    dispatch({
+      type: 'videoQueued',
+      jobId: result.job_id,
+    })
+
+    // 202는 작업 접수이므로 아직 rendered 액션을 호출하지 않음
+  }
   /** 1단계부터 시작. 검토 모드는 3단계 후 멈추고, 자동 모드는 5단계까지 */
   const start = async (input: ContentInput) => {
     const signal = begin()
@@ -157,12 +188,59 @@ export function usePipeline() {
   /** 지금 장면·음성 설정으로 4~5단계 실행 (검토 후 "영상 만들기", 완성 후 "다시 만들기") */
   const render = async () => {
     const { scenes, audio } = stateRef.current
+
+    // 영상 생성 전에 이미지가 없는 장면 확인
+    const missingImage = scenes.findIndex(
+      (scene) => !scene.asset_id
+    )
+
+    if (missingImage !== -1) {
+      alert(
+        `${missingImage + 1}번 장면에 이미지가 없습니다.\n이미지를 선택한 후 다시 영상 만들기를 시도해주세요.`
+      )
+      return
+    }
+
+    // 검증을 통과한 경우에만 영상 생성 시작
     const signal = begin()
-    dispatch({ type: 'runStart', phase: 'rendering' })
+
+    dispatch({
+      type: 'runStart',
+      phase: 'rendering',
+    })
+
     try {
       await runRender(scenes, audio, signal)
     } catch (error) {
       handleError(signal, error)
+    }
+  }
+
+  const checkResult = async () => {
+    const { jobId, scenes, audio } = stateRef.current
+
+    if (!jobId) return
+
+    try {
+      const ready = await checkVideoReady(jobId)
+
+      if (!ready) {
+        alert('아직 영상을 제작하고 있어. 잠시 후 다시 확인해 줘.')
+        return
+      }
+
+      dispatch({
+        type: 'rendered',
+        result: {
+          duration_sec: 0,
+          width: 1080,
+          height: 1920,
+          download_url: videoDownloadUrl(jobId),
+        },
+        renderedWith: renderKey(scenes, audio),
+      })
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '영상 확인에 실패했어.')
     }
   }
 
@@ -177,5 +255,5 @@ export function usePipeline() {
 
   const stale = state.result != null && state.renderedWith !== renderKey(state.scenes, state.audio)
 
-  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale }
+  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale, checkResult }
 }

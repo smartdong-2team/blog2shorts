@@ -19,7 +19,7 @@ import { useHealthCheck } from '../hooks/useHealthCheck'
 import { scrollToElement } from '../utils/scroll'
 
 export function HomePage() {
-  const { state, dispatch, running, start, render, cancel, stepElapsed, stale } = usePipeline()
+  const { state, dispatch, running, start, render, cancel, stepElapsed, stale, checkResult } = usePipeline()
   const [sourceVisible, setSourceVisible] = useState(true)
   const [highlight, setHighlight] = useState<{ assetId: string; n: number } | null>(null)
   const { state: health, retry } = useHealthCheck()
@@ -90,6 +90,12 @@ export function HomePage() {
             </Card>
           )}
         </SplitLayout>
+      )}
+
+      {state.jobId && !state.result && (
+        <Button onClick={checkResult}>
+          완성 영상 확인하기
+        </Button>
       )}
 
       <VideoPreview

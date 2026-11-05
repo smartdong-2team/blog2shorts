@@ -69,3 +69,22 @@ export interface ContentExtractResponse {
     alt: string | null
   }[]
 }
+
+
+// api - videos.ts 관련 타입 정리 
+export interface VideoCreateRequest {
+  scenes: {
+    order: number
+    role: string
+    narration: string
+    caption: string
+    asset_id: string
+  }[]
+  voice: string | null
+}
+
+export interface VideoCreateResponse {
+  job_id: string
+  status: string
+  status_url: string
+}
