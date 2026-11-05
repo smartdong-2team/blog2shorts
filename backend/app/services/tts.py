@@ -3,9 +3,7 @@ import asyncio
 import wave
 from pathlib import Path
 from uuid import uuid4
-
-from openai import AsyncOpenAI
-
+from app.core.openai import get_openai_client
 from app.schemas.audio import AudioAsset
 
 
@@ -28,7 +26,7 @@ async def generate_speech(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{uuid4().hex}.wav"
 
-    client = AsyncOpenAI()
+    client = get_openai_client()
 
     try:
         async with client.audio.speech.with_streaming_response.create(

@@ -1,16 +1,17 @@
-
+import asyncio
 import wave
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
-
-from app.schemas.audio import AudioAsset
+from pathlib import Path
+from uuid import uuid4
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.tts import (
-    TTSGenerationError,
     generate_speech,
     get_wav_duration,
+    TTSGenerationError,
 )
+
+from app.core.openai import get_openai_client
+from app.schemas.audio import AudioAsset
 
 
 def create_test_wav(
@@ -79,7 +80,10 @@ def test_get_wav_duration(tmp_path):
 async def test_generate_speech_success(tmp_path):
     client = mock_openai_client(duration_sec=2.5)
 
-    with patch("app.services.tts.AsyncOpenAI", return_value=client):
+    with patch(
+        "app.services.tts.get_openai_client",
+        return_value=client,
+    ):
         result = await generate_speech(
             narration="안녕하세요. 테스트입니다.",
             output_dir=tmp_path,
@@ -105,7 +109,10 @@ async def test_generate_speech_success(tmp_path):
 async def test_generate_speech_custom_voice(tmp_path):
     client = mock_openai_client()
 
-    with patch("app.services.tts.AsyncOpenAI", return_value=client):
+    with patch(
+        "app.services.tts.get_openai_client",
+        return_value=client,
+    ):
         await generate_speech(
             narration="음성 선택 테스트입니다.",
             output_dir=tmp_path,
@@ -148,7 +155,10 @@ async def test_generate_speech_api_failure(tmp_path):
         RuntimeError("API unavailable")
     )
 
-    with patch("app.services.tts.AsyncOpenAI", return_value=client):
+    with patch(
+        "app.services.tts.get_openai_client",
+        return_value=client,
+    ):
         with pytest.raises(TTSGenerationError):
             await generate_speech(
                 narration="API 실패 테스트",
@@ -181,7 +191,10 @@ async def test_generate_speech_cleans_up_partial_file(tmp_path):
         context_manager
     )
 
-    with patch("app.services.tts.AsyncOpenAI", return_value=client):
+    with patch(
+        "app.services.tts.get_openai_client",
+        return_value=client,
+    ):
         with pytest.raises(TTSGenerationError):
             await generate_speech(
                 narration="파일 정리 테스트",
