@@ -1,14 +1,27 @@
 
 """OpenAI를 이용한 숏폼 대본 생성 서비스."""
 
-from openai import AsyncOpenAI
+import logging
+from pydantic import ValidationError
+from openai import AsyncOpenAI, APIConnectionError, APITimeoutError, InternalServerError
 
 from app.core.config import get_settings
 from app.schemas.script import (
     ScriptAIOutput,
     ScriptOutputFormat,
     ScriptGenerateRequest,
+    ScriptGenerateResponse,
 )
+
+logger = logging.getLogger(__name__)
+
+MAX_ATTEMPTS = 2
+CHARS_PER_SECOND = 5
+
+class ScriptGenerationError(Exception):
+    """대본 생성에 최종적으로 실패한 경우."""
+
+
 
 
 # --------------------------------------------------
@@ -19,21 +32,55 @@ def get_openai_client() -> AsyncOpenAI:
 
     settings = get_settings()
 
-    if settings.openai_api_key is None:
+    if (
+        settings.openai_api_key is None
+        or not settings.openai_api_key.get_secret_value()
+    ):
         raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
 
+    # SDK 자체의 자동 재시도는 끄고 서비스에서 관리한다.
     return AsyncOpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
+        max_retries=0,
     )
 
+# --------------------------------------------------
+# 2. 이미지 ID 검증
+# --------------------------------------------------
+def validate_image_ids(
+    result: ScriptAIOutput,
+    request: ScriptGenerateRequest,
+) -> None:
+    """생성된 이미지 ID가 요청에 포함된 이미지인지 검증한다."""
+
+    allowed_ids = {image.asset_id for image in request.images}
+
+    for scene in result.scenes:
+        if scene.asset_id is not None and scene.asset_id not in allowed_ids:
+            raise ValueError(
+                f"허용되지 않은 이미지 ID: {scene.asset_id}"
+            )
 
 # --------------------------------------------------
-# 2. 대본 생성 함수
+# 3. 예상 영상 길이 계산
+# --------------------------------------------------
+def estimate_duration(result: ScriptAIOutput) -> int:
+    """나레이션 글자 수를 기반으로 예상 영상 길이를 계산한다."""
+
+    total_chars = sum(
+        len(scene.narration)
+        for scene in result.scenes
+    )
+
+    return round(total_chars / CHARS_PER_SECOND)
+
+# --------------------------------------------------
+# 4. 대본 생성 함수
 # --------------------------------------------------
 async def generate_script(
     request: ScriptGenerateRequest,
-) -> ScriptAIOutput:
-    """원본 콘텐츠를 숏폼 영상 대본으로 변환한다."""
+) -> ScriptGenerateResponse:
+    """숏폼 대본을 생성하고 검증한 뒤 최종 응답을 반환한다."""
 
     client = get_openai_client()
 
@@ -55,30 +102,62 @@ async def generate_script(
         f"제목: {request.title or '없음'}\n"
         f"본문:\n{request.text}\n"
         f"목표 영상 길이: {request.target_duration_sec}초\n"
-        f"사용 가능한 이미지 ID: "
-        f"{[image.asset_id for image in request.images]}"
+        f"사용 가능한 이미지 ID와 설명:\n"
+        f"{[(image.asset_id, image.alt) for image in request.images]}"
     )
 
-    # 1. OpenAI 호출
-    #ScriptOutputFormat: OpenAI가 어떤 형태의 데이터를 생성해야 하는지 지정
-    response = await client.responses.parse(
-        model="gpt-4.1-mini",
-        instructions=instructions,
-        input=user_input,
-        text_format=ScriptOutputFormat, 
-    )
+    try:
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                # 1. OpenAI 대본 생성
+                response = await client.responses.parse(
+                    model="gpt-4.1-mini",
+                    instructions=instructions,
+                    input=user_input,
+                    text_format=ScriptOutputFormat,
+                )
 
-    # 2. 결과 존재 여부 확인
-    ai_output = response.output_parsed
+                ai_output = response.output_parsed
 
-    if ai_output is None:
-        raise ValueError("AI 대본 생성 결과가 없습니다.")
+                if ai_output is None:
+                    raise ValueError("AI 대본 생성 결과가 없습니다.")
 
-    # 3. 서버의 비즈니스 규칙 검증
-    #ScriptAIOutput: 생성된 결과가 장면 수, 순서, 글자 수 등 우리 서비스 규칙을 만족하는지 검증
-    validated = ScriptAIOutput.model_validate( 
-        ai_output.model_dump()
-    )
+                # 2. 비즈니스 규칙 검증
+                validated = ScriptAIOutput.model_validate(
+                    ai_output.model_dump()
+                )
 
-    # 4. 검증된 결과 반환
-    return validated
+                # 3. 이미지 ID 검증
+                validate_image_ids(validated, request)
+
+                # 4. 예상 영상 길이 계산
+                estimated_duration_sec = estimate_duration(validated)
+
+                # 5. 최종 응답 생성
+                return ScriptGenerateResponse(
+                    **validated.model_dump(),
+                    estimated_duration_sec=estimated_duration_sec,
+                )
+
+            except (
+                ValidationError,
+                ValueError,
+                APIConnectionError,
+                APITimeoutError,
+                InternalServerError,
+            ) as error:
+                logger.warning(
+                    "대본 생성 실패 (%d/%d): %s",
+                    attempt + 1,
+                    MAX_ATTEMPTS,
+                    type(error).__name__,
+                )
+
+                if attempt == MAX_ATTEMPTS - 1:
+                    raise ScriptGenerationError(
+                        "대본 생성 및 검증에 실패했습니다."
+                    ) from error
+    finally:
+        await client.close()
+
+    raise ScriptGenerationError("대본 생성에 실패했습니다.")
