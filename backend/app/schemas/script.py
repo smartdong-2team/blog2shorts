@@ -1,27 +1,18 @@
-# request
 
-# {
-#   "title": "인디자인독학 실무자들은 이렇게 공부해요",
-#   "text": "본문 텍스트 (200~20,000자)",
-#   "images": [ { "asset_id": "5b8e…", "alt": null } ],
-#   "target_duration_sec": 45
-# }
+"""
+AI 숏폼 대본 생성 API 스키마.
 
+Endpoint: POST /api/v1/scripts/generate
 
-# response
-# {
-#   "summary": { "topic": "인디자인 독학 방법", "key_points": ["…", "…", "…"] },
-#   "scenes": [
-#     { "order": 1, "role": "hook", "narration": "디자이너들은 인디자인을 어떻게 공부할까요?", "caption": "실무자는 이렇게 공부한다", "asset_id": "5b8e…" },
-#     { "order": 2, "role": "body", "narration": "…", "caption": "…", "asset_id": "…" },
-#     { "order": 3, "role": "body", "narration": "…", "caption": "…", "asset_id": null },
-#     { "order": 4, "role": "cta",  "narration": "…", "caption": "…", "asset_id": "…" }
-#   ],
-#   "estimated_duration_sec": 42
-# }
+역할:
+- 클라이언트 요청 데이터 검증
+- OpenAI 생성 결과의 구조 및 비즈니스 규칙 검증
+- 프론트엔드에 반환할 최종 응답 구조 정의
 
-
-
+참고:
+- 요청과 응답의 형식은 API 명세를 기준으로 한다.
+- 예상 영상 길이는 AI가 아닌 서버에서 계산한다.
+"""
 
 from typing import Literal
 
@@ -33,38 +24,115 @@ from pydantic import (
 )
 
 
+# --------------------------------------------------
+# 1. 요청(Request) 스키마
+# --------------------------------------------------
+
 class ScriptImage(BaseModel):
+    """대본 생성에 사용할 이미지의 메타데이터."""
+
     model_config = ConfigDict(extra="forbid")
 
-    asset_id: str = Field(min_length=1)
-    alt: str | None = None
+    asset_id: str = Field(
+        min_length=1,
+        description="업로드된 이미지의 고유 식별자",
+    )
+    alt: str | None = Field(
+        default=None,
+        description="이미지 설명. 없으면 null",
+    )
 
 
-# 프론트엔드 입력 검증
 class ScriptGenerateRequest(BaseModel):
+    """프론트엔드에서 전달하는 대본 생성 요청."""
+
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(
         default=None,
         max_length=200,
+        description="콘텐츠 제목 (선택)",
     )
     text: str = Field(
         min_length=200,
         max_length=20_000,
+        description="대본 생성에 사용할 본문 텍스트",
     )
     images: list[ScriptImage] = Field(
         default_factory=list,
         max_length=20,
+        description="사용 가능한 이미지 목록. 직접 입력 시 빈 배열",
     )
     target_duration_sec: int = Field(
         default=45,
         ge=30,
         le=60,
+        description="목표 영상 길이(초). 기본값 45초",
     )
 
 
-#OpenAI 생성 결과 검증
+# --------------------------------------------------
+# 2. 공통 데이터 스키마
+# --------------------------------------------------
+
+class ScriptSummary(BaseModel):
+    """원본 콘텐츠를 분석한 핵심 정보."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic: str = Field(
+        description="콘텐츠의 핵심 주제",
+    )
+    key_points: list[str] = Field(
+        description="대본 구성에 사용할 핵심 내용 목록",
+    )
+
+
+class ScriptScene(BaseModel):
+    """숏폼 영상의 개별 장면 정보."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    order: int = Field(
+        ge=1,
+        description="장면 순서. 1부터 시작",
+    )
+    role: Literal["hook", "body", "cta"] = Field(
+        description="장면 역할: 도입, 본문, 행동 유도",
+    )
+    narration: str = Field(
+        min_length=1,
+        max_length=120,
+        description="TTS 음성으로 변환할 장면별 대본",
+    )
+    caption: str = Field(
+        min_length=1,
+        max_length=30,
+        description="화면에 표시할 짧은 요약 자막",
+    )
+    asset_id: str | None = Field(
+        default=None,
+        description="사용할 이미지 ID. null이면 대체 배경 사용",
+    )
+
+
+# --------------------------------------------------
+# 3. AI 생성 결과 스키마
+# --------------------------------------------------
+
 class ScriptAIOutput(BaseModel):
+    """
+    OpenAI가 생성한 대본 결과를 검증한다.
+
+    검증 규칙:
+    - 장면 수: 4~6개
+    - 장면 순서: 1부터 연속
+    - 장면 역할: hook → body → cta
+    - 전체 나레이션 길이: 150~350자
+
+    estimated_duration_sec는 AI 출력에 포함하지 않는다.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     summary: ScriptSummary
@@ -75,10 +143,18 @@ class ScriptAIOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_scenes(self):
-        for index, scene in enumerate(self.scenes):
-            if scene.order != index + 1:
-                raise ValueError("Invalid scene order")
+        """장면 순서, 역할, 전체 나레이션 길이를 검증한다."""
 
+        for index, scene in enumerate(self.scenes):
+            expected_order = index + 1
+
+            if scene.order != expected_order:
+                raise ValueError(
+                    f"Scene order must be {expected_order}"
+                )
+
+            # 첫 장면은 hook, 마지막은 cta,
+            # 그 사이 장면은 모두 body여야 한다.
             expected_role = (
                 "hook" if index == 0
                 else "cta" if index == len(self.scenes) - 1
@@ -86,88 +162,39 @@ class ScriptAIOutput(BaseModel):
             )
 
             if scene.role != expected_role:
-                raise ValueError("Invalid scene role")
-
-        total_length = sum(
-            len(scene.narration) for scene in self.scenes
-        )
-
-        if not 150 <= total_length <= 350:
-            raise ValueError("Invalid narration length")
-
-        return self
-
-
-class ScriptGenerateResponse(ScriptAIOutput):
-    estimated_duration_sec: int = Field(ge=0)
-
-class ScriptSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    topic: str
-    key_points: list[str]
-
-
-class ScriptScene(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    order: int = Field(ge=1)
-    role: Literal["hook", "body", "cta"]
-    narration: str = Field(
-        min_length=1,
-        max_length=120,
-    )
-    caption: str = Field(
-        min_length=1,
-        max_length=30,
-    )
-    asset_id: str | None = None
-
-#예상 영상 길이를 추가한 최종 응답
-class ScriptGenerateResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    summary: ScriptSummary
-    scenes: list[ScriptScene] = Field(
-        min_length=4,
-        max_length=6,
-    )
-    estimated_duration_sec: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def validate_scene_structure(self):
-        scenes = self.scenes
-
-        for index, scene in enumerate(scenes, start=1):
-            if scene.order != index:
                 raise ValueError(
-                    "Scene order must start at 1 "
-                    "and increase sequentially."
+                    f"Scene {expected_order} "
+                    f"must have role '{expected_role}'"
                 )
 
-            expected_role = (
-                "hook"
-                if index == 1
-                else "cta"
-                if index == len(scenes)
-                else "body"
-            )
-
-            if scene.role != expected_role:
-                raise ValueError(
-                    f"Scene {index} must have "
-                    f"role '{expected_role}'."
-                )
-
+        # 전체 나레이션 길이는 장면별 글자 수의 합이다.
         total_length = sum(
             len(scene.narration)
-            for scene in scenes
+            for scene in self.scenes
         )
 
         if not 150 <= total_length <= 350:
             raise ValueError(
                 "Total narration length "
-                "must be between 150 and 350."
+                "must be between 150 and 350"
             )
 
         return self
+
+
+# --------------------------------------------------
+# 4. 최종 API 응답 스키마
+# --------------------------------------------------
+
+class ScriptGenerateResponse(ScriptAIOutput):
+    """
+    프론트엔드에 반환하는 최종 대본 생성 결과.
+
+    ScriptAIOutput의 검증 규칙을 상속한다.
+    서버에서 계산한 예상 영상 길이만 추가한다.
+    """
+
+    estimated_duration_sec: int = Field(
+        ge=0,
+        description="서버에서 글자 수를 기반으로 계산한 예상 영상 길이(초)",
+    )
