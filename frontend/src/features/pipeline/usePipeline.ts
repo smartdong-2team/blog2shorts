@@ -188,8 +188,27 @@ export function usePipeline() {
   /** 지금 장면·음성 설정으로 4~5단계 실행 (검토 후 "영상 만들기", 완성 후 "다시 만들기") */
   const render = async () => {
     const { scenes, audio } = stateRef.current
+
+    // 영상 생성 전에 이미지가 없는 장면 확인
+    const missingImage = scenes.findIndex(
+      (scene) => !scene.asset_id
+    )
+
+    if (missingImage !== -1) {
+      alert(
+        `${missingImage + 1}번 장면에 이미지가 없습니다.\n이미지를 선택한 후 다시 영상 만들기를 시도해주세요.`
+      )
+      return
+    }
+
+    // 검증을 통과한 경우에만 영상 생성 시작
     const signal = begin()
-    dispatch({ type: 'runStart', phase: 'rendering' })
+
+    dispatch({
+      type: 'runStart',
+      phase: 'rendering',
+    })
+
     try {
       await runRender(scenes, audio, signal)
     } catch (error) {
@@ -236,5 +255,5 @@ export function usePipeline() {
 
   const stale = state.result != null && state.renderedWith !== renderKey(state.scenes, state.audio)
 
-  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale,checkResult }
+  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale, checkResult }
 }
