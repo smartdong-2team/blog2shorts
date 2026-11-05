@@ -1,5 +1,6 @@
-import { SAMPLE_CONTENT, SAMPLE_SCENES, SAMPLE_SUMMARY } from './mockData'
+import { SAMPLE_SCENES, SAMPLE_SUMMARY } from './mockData'
 import { assignRoles, estimateSec, newSceneId } from './scenes'
+import { extractBlogContent } from '../../api/content'
 import type { AudioSettings, Content, ContentInput, RenderResult, Scene, ScriptSummary } from './types'
 
 // 백엔드 연결 전 목업. 함수 이름·인자는 docs/api-design.md 엔드포인트에 대응한다.
@@ -31,11 +32,47 @@ function sentences(text: string) {
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
 /** POST /content/extract (URL) — 직접 입력이면 서버를 거치지 않고 그대로 쓴다 */
-export async function extractContent(input: ContentInput, signal: AbortSignal): Promise<Content> {
-  await wait(input.kind === 'url' ? 2200 : 600, signal)
-  if (input.kind === 'url') return { ...SAMPLE_CONTENT, source_url: input.url }
-  return { title: input.title.trim() || '직접 입력한 글', text: input.text.trim(), images: [], source_url: null }
+// export async function extractContent(input: ContentInput, signal: AbortSignal): Promise<Content> {
+//   await wait(input.kind === 'url' ? 2200 : 600, signal)
+//   if (input.kind === 'url') return { ...SAMPLE_CONTENT, source_url: input.url }
+//   return { title: input.title.trim() || '직접 입력한 글', text: input.text.trim(), images: [], source_url: null }
+// }
+
+export async function extractContent(
+  input: ContentInput,
+  signal: AbortSignal,
+): Promise<Content> {
+  // 직접 입력은 서버 추출 없이 사용
+  if (input.kind === 'text') {
+    return {
+      title: input.title.trim() || '직접 입력한 글',
+      text: input.text.trim(),
+      images: [],
+      source_url: null,
+    }
+  }
+
+  // URL 입력은 실제 백엔드 API 호출
+  const response = await extractBlogContent(
+    { url: input.url },
+    signal,
+  )
+
+  return {
+    title: response.title,
+    text: response.text,
+    images: response.images.map((image) => ({
+      asset_id: image.asset_id,
+      url: new URL(
+        image.url,
+        import.meta.env.VITE_API_BASE_URL,
+      ).href,
+      alt: image.alt,
+    })),
+    source_url: response.source.url,
+  }
 }
+
 
 /** POST /scripts/generate 의 summary 부분 */
 export async function generateScript(content: Content, signal: AbortSignal): Promise<ScriptSummary> {
