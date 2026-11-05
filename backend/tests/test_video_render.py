@@ -5,14 +5,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.schemas.audio import AudioAsset,SubtitleCue
-from app.schemas.video import RenderScene, VideoSettings
+from app.schemas.video import RenderScene, VideoSettings,VideoRenderRequest
 from app.services.video_render import (
     VideoRenderingError,
     render_scene,
     normalize_subtitles,
     build_subtitle_filter,
+    render_video
 )
-
 
 
 # ==========================================================
@@ -557,3 +557,206 @@ async def test_render_scene_without_subtitles_needs_no_font(tmp_path):
 
     assert result == output_path
     assert "drawtext=" not in command_text
+
+
+
+# ==========================================================
+# 9. 다중 장면 렌더링 테스트
+# ==========================================================
+
+@pytest.mark.asyncio
+async def test_render_video_multiple_scenes(tmp_path):
+    """여러 장면이 순서대로 렌더링되고 연결된다."""
+    from unittest.mock import AsyncMock
+
+    scenes = []
+
+    for order in range(1, 4):
+        image_path = tmp_path / f"image-{order}.jpg"
+        audio_path = tmp_path / f"audio-{order}.wav"
+
+        image_path.write_bytes(b"fake image")
+        audio_path.write_bytes(b"fake audio")
+
+        scenes.append(
+            RenderScene(
+                order=order,
+                image_path=image_path,
+                audio=AudioAsset(
+                    path=str(audio_path),
+                    duration_sec=float(order),
+                ),
+            )
+        )
+
+    request = VideoRenderRequest(
+        scenes=scenes,
+        output_path=tmp_path / "final.mp4",
+    )
+
+    async def fake_render_scene(
+        scene,
+        output_path,
+        settings=None,
+        scene_start_sec=0.0,
+        font_file=None,
+    ):
+        output_path.write_bytes(b"fake scene mp4")
+        return output_path
+
+    process = make_mock_process()
+    render_calls = []
+
+    async def track_render_scene(**kwargs):
+        render_calls.append(kwargs)
+        return await fake_render_scene(**kwargs)
+
+    async def mock_exec(*command, **kwargs):
+        request.output_path.write_bytes(b"fake final mp4")
+        return process
+
+    with (
+        patch(
+            "app.services.video_render.render_scene",
+            side_effect=track_render_scene,
+        ),
+        patch(
+            "app.services.video_render.asyncio.create_subprocess_exec",
+            side_effect=mock_exec,
+        ) as mock_subprocess,
+    ):
+        result = await render_video(request)
+
+    assert result.path == request.output_path.resolve()
+    assert result.duration_sec == pytest.approx(6.0)
+    assert result.width == 1080
+    assert result.height == 1920
+    assert result.fps == 30
+
+    assert len(render_calls) == 3
+
+    assert [
+        call["scene"].order for call in render_calls
+    ] == [1, 2, 3]
+
+    assert [
+        call["scene_start_sec"] for call in render_calls
+    ] == pytest.approx([0.0, 1.0, 3.0])
+
+    command = mock_subprocess.call_args.args
+
+    assert "-f" in command
+    assert "concat" in command
+    assert "-c" in command
+    assert "copy" in command
+    assert str(request.output_path.resolve()) in command
+
+
+@pytest.mark.asyncio
+async def test_render_video_concat_failure(tmp_path):
+    """FFmpeg 연결 실패 시 오류를 발생시키고 출력 파일을 정리한다."""
+
+    scene = make_scene(tmp_path)
+
+    request = VideoRenderRequest(
+        scenes=[scene],
+        output_path=tmp_path / "final.mp4",
+    )
+
+    async def fake_render_scene(**kwargs):
+        kwargs["output_path"].write_bytes(b"fake scene mp4")
+        return kwargs["output_path"]
+
+    process = make_mock_process()
+    process.returncode = 1
+    process.communicate = AsyncMock(
+        return_value=(b"", b"concat failed")
+    )
+
+    async def mock_exec(*command, **kwargs):
+        request.output_path.write_bytes(b"partial mp4")
+        return process
+
+    with (
+        patch(
+            "app.services.video_render.render_scene",
+            side_effect=fake_render_scene,
+        ),
+        patch(
+            "app.services.video_render.asyncio.create_subprocess_exec",
+            side_effect=mock_exec,
+        ),
+    ):
+        with pytest.raises(
+            VideoRenderingError,
+            match="장면 연결 실패",
+        ):
+            await render_video(request)
+
+    assert not request.output_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_render_video_scene_failure(tmp_path):
+    """장면 렌더링 실패 시 concat을 실행하지 않는다."""
+
+    scene = make_scene(tmp_path)
+
+    request = VideoRenderRequest(
+        scenes=[scene],
+        output_path=tmp_path / "final.mp4",
+    )
+
+    with (
+        patch(
+            "app.services.video_render.render_scene",
+            side_effect=VideoRenderingError("scene failed"),
+        ),
+        patch(
+            "app.services.video_render.asyncio.create_subprocess_exec",
+        ) as mock_subprocess,
+    ):
+        with pytest.raises(
+            VideoRenderingError,
+            match="scene failed",
+        ):
+            await render_video(request)
+
+    mock_subprocess.assert_not_called()
+    assert not request.output_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_render_video_missing_final_output(tmp_path):
+    """FFmpeg가 성공했지만 최종 파일이 없으면 오류를 발생시킨다."""
+
+    scene = make_scene(tmp_path)
+
+    request = VideoRenderRequest(
+        scenes=[scene],
+        output_path=tmp_path / "final.mp4",
+    )
+
+    async def fake_render_scene(**kwargs):
+        kwargs["output_path"].write_bytes(b"fake scene mp4")
+        return kwargs["output_path"]
+
+    process = make_mock_process()
+
+    with (
+        patch(
+            "app.services.video_render.render_scene",
+            side_effect=fake_render_scene,
+        ),
+        patch(
+            "app.services.video_render.asyncio.create_subprocess_exec",
+            return_value=process,
+        ),
+    ):
+        with pytest.raises(
+            VideoRenderingError,
+            match="최종 영상이 생성되지 않았습니다",
+        ):
+            await render_video(request)
+
+    assert not request.output_path.exists()

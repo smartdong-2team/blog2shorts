@@ -1,9 +1,14 @@
 
 import asyncio
+import tempfile
 from pathlib import Path
 
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
+from app.schemas.video import (
+    VideoRenderRequest,
+    VideoRenderResult,
+)
 
 
 class VideoRenderingError(Exception):
@@ -97,6 +102,7 @@ def build_subtitle_filter(
     return ",".join(filters)
 
 
+# 단일 씬 생성 함수
 async def render_scene(
     scene: RenderScene,
     output_path: Path,
@@ -208,3 +214,99 @@ async def render_scene(
     except Exception:
         output_path.unlink(missing_ok=True)
         raise
+
+
+
+# 씬을 연결해 하나의 MP4로 합성
+async def render_video(
+    request: VideoRenderRequest,
+    font_file: Path | None = None,
+) -> VideoRenderResult:
+    """여러 장면을 렌더링하고 하나의 MP4로 연결한다."""
+
+    output_path = request.output_path.resolve()
+
+    # 최종 출력 경로 준비
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 장면별 렌더링은 임시 디렉터리에서 수행한다.
+    with tempfile.TemporaryDirectory(
+        prefix="blog2shorts-render-"
+    ) as temp_dir:
+        temp_path = Path(temp_dir)
+
+        scene_paths: list[Path] = []
+        scene_start_sec = 0.0
+
+        # 1. 각 장면을 개별 MP4로 렌더링
+        for scene in request.scenes:
+            scene_output = (
+                temp_path / f"scene-{scene.order:03d}.mp4"
+            )
+
+            await render_scene(
+                scene=scene,
+                output_path=scene_output,
+                settings=request.settings,
+                scene_start_sec=scene_start_sec,
+                font_file=font_file,
+            )
+
+            scene_paths.append(scene_output)
+            scene_start_sec += scene.audio.duration_sec
+
+        # 2. FFmpeg concat 목록 생성
+        concat_file = temp_path / "concat.txt"
+
+        concat_file.write_text(
+            "".join(
+                f"file '{path.name}'\n"
+                for path in scene_paths
+            ),
+            encoding="utf-8",
+        )
+
+        # 3. 장면 영상 연결
+        command = [
+            "ffmpeg",
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_file),
+            "-c", "copy",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(temp_path),
+            )
+
+            _, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                raise VideoRenderingError(
+                    "FFmpeg 장면 연결 실패: "
+                    f"{stderr.decode(errors='replace')}"
+                )
+
+            if not output_path.is_file():
+                raise VideoRenderingError(
+                    "FFmpeg 실행 후 최종 영상이 생성되지 않았습니다."
+                )
+
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            raise
+
+    return VideoRenderResult(
+        path=output_path,
+        duration_sec=scene_start_sec,
+        width=request.settings.width,
+        height=request.settings.height,
+        fps=request.settings.fps,
+    )
