@@ -2,6 +2,7 @@
 import asyncio
 import tempfile
 from pathlib import Path
+import time
 
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
@@ -110,10 +111,12 @@ async def render_scene(
     scene_start_sec: float = 0.0,
     font_file: Path | None = None,
 ) -> Path:
+
     """이미지와 음성을 합성하여 단일 장면 MP4를 생성한다.
 
     현재 버전은 자막을 합성하지 않는다.
     """
+    print("[DEBUG] render_scene 진입 성공", flush=True)
 
     settings = settings or VideoSettings()
 
@@ -149,6 +152,7 @@ async def render_scene(
         )
 
     
+    print("[DEBUG] 자막 시간 계산 시작", flush=True)
     # 전체 영상 기준 자막을 현재 장면 기준으로 변환
     local_subtitles = normalize_subtitles(
         subtitles=scene.subtitles,
@@ -170,7 +174,7 @@ async def render_scene(
 
         image_filter = f"{image_filter},{subtitle_filter}"
 
-
+    print("[DEBUG] FFmpeg 명령어 생성 시작", flush=True)
     command = [
         "ffmpeg",
         "-y",
@@ -180,7 +184,8 @@ async def render_scene(
         "-i", str(audio_path),
         "-vf", image_filter,
         "-c:v", "libx264",
-        "-preset", "medium",
+        "-preset", "ultrafast",
+        "-crf", "23",
         "-pix_fmt", "yuv420p",
         "-r", str(settings.fps),
         "-c:a", "aac",
@@ -191,17 +196,34 @@ async def render_scene(
     ]
 
     try:
+        print("[FFmpeg] 실행 직전", flush=True)
+        print(f"[FFmpeg] 명령어: {command}", flush=True)
+
         process = await asyncio.create_subprocess_exec(
             *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=None,
         )
 
-        _, stderr = await process.communicate()
+        print(
+            f"[FFmpeg] 프로세스 시작 (PID: {process.pid})",
+            flush=True,
+        )
+
+        await asyncio.wait_for(
+            process.wait(),
+            timeout=60,
+        )
+
+        print(
+            f"[FFmpeg] 프로세스 종료: {process.returncode}",
+            flush=True,
+        )
 
         if process.returncode != 0:
             raise VideoRenderingError(
-                f"FFmpeg 렌더링 실패: {stderr.decode(errors='replace')}"
+                f"FFmpeg 렌더링 실패 (종료 코드: {process.returncode})"
             )
 
         if not output_path.is_file():
@@ -210,6 +232,14 @@ async def render_scene(
             )
 
         return output_path
+
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+        output_path.unlink(missing_ok=True)
+        raise VideoRenderingError(
+            "FFmpeg 렌더링 시간 초과 (60초)"
+        )
 
     except Exception:
         output_path.unlink(missing_ok=True)
@@ -239,9 +269,17 @@ async def render_video(
         scene_start_sec = 0.0
 
         # 1. 각 장면을 개별 MP4로 렌더링
+        # 1. 각 장면을 개별 MP4로 렌더링
         for scene in request.scenes:
             scene_output = (
                 temp_path / f"scene-{scene.order:03d}.mp4"
+            )
+
+            start = time.perf_counter()
+
+            print(
+                f"[Render] 장면 {scene.order} 렌더링 시작",
+                flush=True,
             )
 
             await render_scene(
@@ -250,6 +288,12 @@ async def render_video(
                 settings=request.settings,
                 scene_start_sec=scene_start_sec,
                 font_file=font_file,
+            )
+
+            print(
+                f"[Render] 장면 {scene.order} 완료: "
+                f"{time.perf_counter() - start:.2f}초",
+                flush=True,
             )
 
             scene_paths.append(scene_output)
@@ -279,19 +323,30 @@ async def render_video(
         ]
 
         try:
+            print("[FFmpeg] 프로세스 실행 요청", flush=True)
+            print(f"[FFmpeg] 명령어: {command}", flush=True)
+
             process = await asyncio.create_subprocess_exec(
                 *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(temp_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=None,
             )
 
-            _, stderr = await process.communicate()
+            print(
+                f"[FFmpeg] 프로세스 시작됨 (PID: {process.pid})",
+                flush=True,
+            )
+
+            await process.wait()
+
+            print(
+                f"[FFmpeg] 프로세스 종료 (code: {process.returncode})",
+                flush=True,
+            )
 
             if process.returncode != 0:
                 raise VideoRenderingError(
-                    "FFmpeg 장면 연결 실패: "
-                    f"{stderr.decode(errors='replace')}"
+                    f"FFmpeg 장면 연결 실패 (종료 코드: {process.returncode})"
                 )
 
             if not output_path.is_file():

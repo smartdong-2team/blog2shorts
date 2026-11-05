@@ -77,7 +77,7 @@ async def generate_scene_audio(
             scene_media.append(
                 SceneMedia(
                     order=scene.order,
-                    asset_id=scene.asset_id,
+                    asset_id=str(scene.asset_id),
                     audio=audio,
                     subtitles=[subtitle],
                 )
