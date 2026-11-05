@@ -282,7 +282,6 @@ async def test_generate_scene_audio_tts_failure(tmp_path):
 
 
 # 8. 잘못된 자막 입력 거부
-
 @pytest.mark.asyncio
 async def test_generate_scene_audio_invalid_caption(tmp_path):
     mock_tts = AsyncMock(
@@ -306,3 +305,101 @@ async def test_generate_scene_audio_invalid_caption(tmp_path):
                 ],
                 output_dir=tmp_path,
             )
+
+# 9. TTS 실패 시 생성된 음성 파일 삭제
+@pytest.mark.asyncio
+async def test_cleanup_audio_files_when_tts_fails(tmp_path):
+    """두 번째 장면에서 TTS가 실패하면 첫 번째 음성 파일을 삭제한다."""
+    scenes = [
+        SimpleNamespace(
+            order=1,
+            narration="첫 번째 내레이션",
+            caption="첫 번째 자막",
+            asset_id="asset-1",
+        ),
+        SimpleNamespace(
+            order=2,
+            narration="두 번째 내레이션",
+            caption="두 번째 자막",
+            asset_id="asset-2",
+        ),
+    ]
+
+    output_dir = tmp_path / "audio"
+    output_dir.mkdir()
+
+    first_audio_path = output_dir / "scene-1.wav"
+    first_audio_path.write_bytes(b"fake wav data")
+
+    existing_file = output_dir / "existing.wav"
+    existing_file.write_bytes(b"existing data")
+
+    mock_generate = AsyncMock(
+        side_effect=[
+            AudioAsset(
+                path=str(first_audio_path),
+                duration_sec=2.0,
+            ),
+            TTSGenerationError("두 번째 장면 TTS 생성 실패"),
+        ]
+    )
+
+    with patch(
+        "app.services.audio_pipeline.generate_speech",
+        mock_generate,
+    ):
+        with pytest.raises(TTSGenerationError):
+            await generate_scene_audio(
+                scenes=scenes,
+                output_dir=output_dir,
+            )
+
+    assert not first_audio_path.exists()
+    assert existing_file.exists()
+    assert mock_generate.await_count == 2
+
+
+# 10. 자막 생성 실패 시 생성된 음성 파일 삭제
+@pytest.mark.asyncio
+async def test_cleanup_audio_files_when_subtitle_fails(tmp_path):
+    """TTS 성공 후 자막 생성에 실패해도 음성 파일을 삭제한다."""
+    scenes = [
+        SimpleNamespace(
+            order=1,
+            narration="첫 번째 내레이션",
+            caption="첫 번째 자막",
+            asset_id="asset-1",
+        ),
+    ]
+
+    output_dir = tmp_path / "audio"
+    output_dir.mkdir()
+
+    audio_path = output_dir / "scene-1.wav"
+    audio_path.write_bytes(b"fake wav data")
+
+    mock_generate = AsyncMock(
+        return_value=AudioAsset(
+            path=str(audio_path),
+            duration_sec=2.0,
+        )
+    )
+
+    with (
+        patch(
+            "app.services.audio_pipeline.generate_speech",
+            mock_generate,
+        ),
+        patch(
+            "app.services.audio_pipeline.create_subtitle_timeline",
+            side_effect=ValueError("자막 생성 실패"),
+        ),
+    ):
+        with pytest.raises(ValueError, match="자막 생성 실패"):
+            await generate_scene_audio(
+                scenes=scenes,
+                output_dir=output_dir,
+            )
+
+    assert not audio_path.exists()
+    assert mock_generate.await_count == 1

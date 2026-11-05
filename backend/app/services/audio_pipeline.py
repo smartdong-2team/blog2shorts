@@ -42,47 +42,53 @@ async def generate_scene_audio(
     # 1. 장면별 TTS 생성
     audio_assets = []
 
-    for scene in ordered_scenes:
-        audio = await generate_speech(
-            narration=scene.narration,
-            output_dir=output_dir,
-            voice=voice,
-        )
-
-        audio_assets.append(audio)
-
-    # 2. 실제 음성 길이를 기준으로 자막 타임라인 계산
-    captions = [
-        scene.caption for scene in ordered_scenes
-    ]
-
-    durations = [
-        audio.duration_sec for audio in audio_assets
-    ]
-
-    subtitles = create_subtitle_timeline(
-        captions=captions,
-        durations=durations,
-    )
-
-    # 3. 영상 합성에 필요한 장면별 데이터 구성
-    scene_media = []
-
-    for scene, audio, subtitle in zip(
-        ordered_scenes,
-        audio_assets,
-        subtitles,
-    ):
-        scene_media.append(
-            SceneMedia(
-                order=scene.order,
-                asset_id=scene.asset_id,
-                audio=audio,
-                subtitles=[subtitle],
+    try:
+        for scene in ordered_scenes:
+            audio = await generate_speech(
+                narration=scene.narration,
+                output_dir=output_dir,
+                voice=voice,
             )
+
+            audio_assets.append(audio)
+
+        # 2. 실제 음성 길이를 기준으로 자막 타임라인 계산
+        captions = [
+            scene.caption for scene in ordered_scenes
+        ]
+
+        durations = [
+            audio.duration_sec for audio in audio_assets
+        ]
+
+        subtitles = create_subtitle_timeline(
+            captions=captions,
+            durations=durations,
         )
 
-    return AudioGenerationResult(
-        scenes=scene_media,
-        total_duration_sec=sum(durations),
-    )
+        # 3. 영상 합성에 필요한 장면별 데이터 구성
+        scene_media = []
+
+        for scene, audio, subtitle in zip(
+            ordered_scenes,
+            audio_assets,
+            subtitles,
+        ):
+            scene_media.append(
+                SceneMedia(
+                    order=scene.order,
+                    asset_id=scene.asset_id,
+                    audio=audio,
+                    subtitles=[subtitle],
+                )
+            )
+
+        return AudioGenerationResult(
+            scenes=scene_media,
+            total_duration_sec=sum(durations),
+        )
+    except Exception:
+        for audio in audio_assets:
+            Path(audio.path).unlink(missing_ok=True)
+
+        raise
