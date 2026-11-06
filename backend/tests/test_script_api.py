@@ -116,7 +116,5 @@ def test_generate_script_ai_failure():
         response = client.post(API_URL, json=VALID_REQUEST)
 
     assert response.status_code == 502
-    assert response.json()["detail"] == (
-        "대본 생성에 실패했습니다. 잠시 후 다시 시도해 주세요."
-    )
+    assert response.json()["error"]["code"] == "AI_GENERATION_FAILED"
     mock_generate.assert_awaited_once()

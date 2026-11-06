@@ -179,6 +179,11 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 - props: `open`, `title`, `onClose`, `footer?`, `children`
 - 규칙: `<dialog>` + `showModal()`. Esc·바깥 클릭으로 닫힌다. 브라우저 `alert/confirm`은 쓰지 않는다
 
+### Toast
+- 용도: 실패 원인 알림 (API 키 만료 등)
+- 구성: `ToastList`(`toasts`, `onDismiss`) + `hooks/useToast`
+- 규칙: 오른쪽 위 고정, `--color-danger*` 색, `role="alert"`. 안내를 읽어야 하므로 자동으로 사라지지 않고 X 또는 새 실행 시작으로 닫힌다. 같은 문구는 쌓지 않는다
+
 ### VideoPlayer
 - 용도: 9:16 세로 영상 자리
 - props: `src: string | null`, `label`(스크린리더용)

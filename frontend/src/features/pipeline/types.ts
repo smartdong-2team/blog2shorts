@@ -11,6 +11,8 @@ export type StepId = 1 | 2 | 3 | 4 | 5
 export interface StepState {
   status: StepStatus
   message: string
+  /** 실패 원인. 카드에는 "실패"만 쓰고 원인은 상태 줄에 보여준다 */
+  error?: string
   startedAt?: number
   endedAt?: number
 }

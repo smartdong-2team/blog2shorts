@@ -95,7 +95,7 @@ def test_extract_unsupported_url():
         )
 
     assert response.status_code == 400
-    assert response.json()["detail"]["code"] == "UNSUPPORTED_URL"
+    assert response.json()["error"]["code"] == "UNSUPPORTED_URL"
 
 
 # 3. 블로그 콘텐츠 추출 실패
@@ -112,7 +112,7 @@ def test_extract_content_failure():
         )
 
     assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "EXTRACTION_FAILED"
+    assert response.json()["error"]["code"] == "EXTRACTION_FAILED"
 
 
 # 4. 일부 이미지 다운로드 실패

@@ -32,6 +32,17 @@
 | 502 | `UPSTREAM_ERROR` | 블로그 서버 오류·타임아웃 |
 | 502 | `AI_GENERATION_FAILED` | OpenAI 오류, 거절, 스키마 검증 실패 |
 | 500 | `INTERNAL_ERROR` | 그 외 서버 오류 (내부 메시지 비노출) |
+| 500 | `OPENAI_API_KEY_MISSING` | OpenAI API 키 미설정 |
+| 502 | `OPENAI_API_KEY_EXPIRED` | OpenAI API 키 만료 |
+| 502 | `OPENAI_API_KEY_INVALID` | OpenAI API 키가 올바르지 않음 |
+| 502 | `OPENAI_PERMISSION_DENIED` | 이 키에 사용 권한 없음 |
+| 502 | `OPENAI_QUOTA_EXCEEDED` | 크레딧·사용 한도 소진 |
+| 502 | `OPENAI_RATE_LIMITED` | 요청 과다 |
+| 502 | `OPENAI_MODEL_NOT_FOUND` | 모델을 사용할 수 없음 |
+| 502 | `OPENAI_TIMEOUT` / `OPENAI_CONNECTION_FAILED` / `OPENAI_SERVER_ERROR` | OpenAI 응답 시간 초과 / 연결 실패 / 서버 오류 |
+| 502 | `OPENAI_ERROR` | 그 외 OpenAI 오류 |
+
+OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에 그대로 보내지 않는다. 분류 구현은 `backend/app/core/errors.py`에 있다.
 
 ## 엔드포인트 요약
 
@@ -171,7 +182,8 @@
 
 ## 6. `GET /api/v1/videos/{job_id}`
 
-- 목적: 렌더 작업 진행 상태 조회 (프론트엔드가 1~2초 간격 폴링)
+- 목적: 렌더 작업 진행 상태 조회 (프론트엔드가 2초 간격 폴링)
+- 현재 구현 응답: `{ "job_id": "c1f2…", "status": "queued" | "processing" | "completed" | "failed", "error": null | { "code", "message" } }`. `error.code`는 공통 오류 코드(OpenAI 키 만료 등)이거나 `TTS_FAILED`, `RENDER_FAILED`다. 아래는 최초 설계안이며 `step`·`progress` 등은 아직 구현되지 않았다.
 - Response `200`
 
 ```json

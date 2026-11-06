@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { checkVideoReady, videoDownloadUrl } from '../../api/videos'
+import { ApiError } from '../../api/client'
+import { getVideoStatus, videoDownloadUrl } from '../../api/videos'
 
 // 스크립트 생성을 위한 백엔드 API 연결
 import { generateScript } from '../../api/scripts'
@@ -12,13 +13,24 @@ import { toPipelineScenes } from './scriptAdapter'
 
 import { initialPipeline, pipelineReducer, renderKey } from './pipelineReducer'
 import { assignRoles, estimateSec, formatSec } from './scenes'
-import type { AudioSettings, ContentInput, Scene, StepId } from './types'
+import type { ContentInput, Scene, StepId } from './types'
 
 const imageCount = (text: string) => (text.match(/\[이미지 \d+\]/g) ?? []).length
 const bodyChars = (text: string) => text.replace(/\[이미지 \d+\]/g, '').replace(/\s/g, '').length
 
 /** 실패한 단계를 이미 표시했다는 표시 (바깥 catch에서 다시 처리하지 않도록) */
 class StepFailed extends Error { }
+
+const VIDEO_POLL_MS = 2000
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : '알 수 없는 오류')
+
+interface UsePipelineOptions {
+  /** 사용자에게 알려야 할 실패가 생겼을 때 */
+  onError: (message: string) => void
+  /** 새 실행을 시작할 때 (지난 오류 알림 정리용) */
+  onRunStart: () => void
+}
 
 /** 진행 중일 때만 0.5초마다 갱신되는 현재 시각 (경과 시간 표시용) */
 function useNow(active: boolean) {
@@ -31,7 +43,7 @@ function useNow(active: boolean) {
   return now
 }
 
-export function usePipeline() {
+export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
   const [state, dispatch] = useReducer(pipelineReducer, initialPipeline)
   const abortRef = useRef<AbortController | null>(null)
   const stateRef = useRef(state)
@@ -53,15 +65,64 @@ export function usePipeline() {
         return result
       } catch (error) {
         if (abortRef.current?.signal.aborted) throw error
-        const reason = error instanceof Error ? error.message : '알 수 없는 오류'
-        dispatch({ type: 'stepFail', step: id, message: `실패: ${reason}`, now: Date.now() })
+        const reason = errorMessage(error)
+        dispatch({ type: 'stepFail', step: id, error: reason, now: Date.now() })
+        onError(reason)
         throw new StepFailed(reason)
       }
     },
-    [],
+    [onError],
   )
 
+  const failVideo = useCallback(
+    (reason: string) => {
+      dispatch({ type: 'videoFailed', error: reason, now: Date.now() })
+      onError(reason)
+    },
+    [onError],
+  )
+
+  /** 상태 조회 실패 처리: 사라진 작업은 5단계 실패, 그 외는 알림만 */
+  const handleStatusError = useCallback(
+    (error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) failVideo(error.message)
+      else onError(errorMessage(error))
+    },
+    [failVideo, onError],
+  )
+
+  // 영상 작업은 백그라운드에서 돌므로 실패를 놓치지 않도록 상태를 계속 확인한다
+  const { jobId } = state
+  const hasResult = state.result != null
+  useEffect(() => {
+    if (!jobId || hasResult) return
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout>
+
+    const poll = async () => {
+      try {
+        const { status, error } = await getVideoStatus(jobId)
+        if (stopped) return
+        if (status === 'failed') {
+          failVideo(error?.message ?? '영상 생성에 실패했습니다.')
+          return
+        }
+        if (status === 'completed') return
+        timer = setTimeout(poll, VIDEO_POLL_MS)
+      } catch (error) {
+        if (!stopped) handleStatusError(error)
+      }
+    }
+
+    timer = setTimeout(poll, VIDEO_POLL_MS)
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+    }
+  }, [jobId, hasResult, failVideo, handleStatusError])
+
   const begin = () => {
+    onRunStart()
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -80,17 +141,8 @@ export function usePipeline() {
   // 4~5단계
   const runRender = async (
     scenes: Scene[],
-    audio: AudioSettings,
     signal: AbortSignal,
   ) => {
-    const missingImage = scenes.findIndex((scene) => !scene.asset_id)
-
-    if (missingImage !== -1) {
-      throw new Error(
-        `${missingImage + 1}번 장면에 이미지가 지정되지 않았어.`,
-      )
-    }
-
     const request = {
       scenes: scenes.map((scene, index) => ({
         order: index + 1,
@@ -106,7 +158,13 @@ export function usePipeline() {
     const result = await step(
       5,
       '영상 생성 요청 중',
-      () => createVideo(request, signal),
+      async () => {
+        const missingImage = scenes.findIndex((scene) => !scene.asset_id)
+        if (missingImage !== -1) {
+          throw new Error(`${missingImage + 1}번 장면에 이미지가 지정되지 않았습니다.`)
+        }
+        return createVideo(request, signal)
+      },
       (response) => `영상 생성 요청 접수 · ${response.job_id}`,
     )
 
@@ -179,7 +237,7 @@ export function usePipeline() {
         return
       }
       dispatch({ type: 'runStart', phase: 'rendering' })
-      await runRender(assignRoles(scenes), stateRef.current.audio, signal)
+      await runRender(assignRoles(scenes), signal)
     } catch (error) {
       handleError(signal, error)
     }
@@ -187,7 +245,7 @@ export function usePipeline() {
 
   /** 지금 장면·음성 설정으로 4~5단계 실행 (검토 후 "영상 만들기", 완성 후 "다시 만들기") */
   const render = async () => {
-    const { scenes, audio } = stateRef.current
+    const { scenes } = stateRef.current
 
     // 영상 생성 전에 이미지가 없는 장면 확인
     const missingImage = scenes.findIndex(
@@ -210,7 +268,7 @@ export function usePipeline() {
     })
 
     try {
-      await runRender(scenes, audio, signal)
+      await runRender(scenes, signal)
     } catch (error) {
       handleError(signal, error)
     }
@@ -222,9 +280,14 @@ export function usePipeline() {
     if (!jobId) return
 
     try {
-      const ready = await checkVideoReady(jobId)
+      const { status, error } = await getVideoStatus(jobId)
 
-      if (!ready) {
+      if (status === 'failed') {
+        failVideo(error?.message ?? '영상 생성에 실패했습니다.')
+        return
+      }
+
+      if (status !== 'completed') {
         alert('아직 영상을 제작하고 있어. 잠시 후 다시 확인해 줘.')
         return
       }
@@ -240,7 +303,7 @@ export function usePipeline() {
         renderedWith: renderKey(scenes, audio),
       })
     } catch (error) {
-      alert(error instanceof Error ? error.message : '영상 확인에 실패했어.')
+      handleStatusError(error)
     }
   }
 
