@@ -6,6 +6,7 @@ import { Stack } from '../components/common/Stack'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { StepCard } from '../components/common/StepCard'
 import { Text } from '../components/common/Text'
+import { ToastList } from '../components/common/Toast'
 import { PageLayout } from '../components/layout/PageLayout'
 import { SplitLayout } from '../components/layout/SplitLayout'
 import { ContentInputForm } from '../features/content/ContentInputForm'
@@ -16,10 +17,15 @@ import { usePipeline } from '../features/pipeline/usePipeline'
 import { RESULT_ID, VideoPreview } from '../features/video/VideoPreview'
 import { RenderStatus } from '../features/video/RenderStatus'
 import { useHealthCheck } from '../hooks/useHealthCheck'
+import { useToast } from '../hooks/useToast'
 import { scrollToElement } from '../utils/scroll'
 
 export function HomePage() {
-  const { state, dispatch, running, start, render, cancel, stepElapsed, stale, checkResult } = usePipeline()
+  const { toasts, showToast, dismissToast, clearToasts } = useToast()
+  const { state, dispatch, running, start, render, cancel, stepElapsed, stale, checkResult } = usePipeline({
+    onError: showToast,
+    onRunStart: clearToasts,
+  })
   const [sourceVisible, setSourceVisible] = useState(true)
   const [highlight, setHighlight] = useState<{ assetId: string; n: number } | null>(null)
   const { state: health, retry } = useHealthCheck()
@@ -39,6 +45,8 @@ export function HomePage() {
       title="블로그 → 숏폼 영상"
       description="블로그 URL이나 본문을 넣으면 대본과 장면(HOOK·본문·CTA 4~6개)을 만들고, 목소리와 배경음악을 입혀 9:16 영상으로 만듭니다."
     >
+      <ToastList toasts={toasts} onDismiss={dismissToast} />
+
       <ContentInputForm
         mode={state.mode}
         onModeChange={(mode) => dispatch({ type: 'setMode', mode })}

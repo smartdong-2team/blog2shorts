@@ -88,3 +88,9 @@ export interface VideoCreateResponse {
   status: string
   status_url: string
 }
+
+export interface VideoStatusResponse {
+  job_id: string
+  status: 'queued' | 'processing' | 'completed' | 'failed'
+  error: { code: string; message: string } | null
+}

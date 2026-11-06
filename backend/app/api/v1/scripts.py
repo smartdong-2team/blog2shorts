@@ -13,8 +13,9 @@
 
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
+from app.core.errors import classify_error
 from app.schemas.script import (
     ScriptGenerateRequest,
     ScriptGenerateResponse,
@@ -43,7 +44,4 @@ async def create_script(
         return await generate_script(request)
 
     except ScriptGenerationError as error:
-        raise HTTPException(
-            status_code=502,
-            detail="대본 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-        ) from error
+        raise classify_error(error) from error

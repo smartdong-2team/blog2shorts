@@ -43,7 +43,7 @@ export type PipelineAction =
   | { type: 'runStart'; phase: 'analyzing' | 'rendering' }
   | { type: 'stepStart'; step: StepId; message: string; now: number }
   | { type: 'stepDone'; step: StepId; message: string; now: number }
-  | { type: 'stepFail'; step: StepId; message: string; now: number }
+  | { type: 'stepFail'; step: StepId; error: string; now: number }
   | { type: 'stopped'; message: string; now: number }
   | { type: 'waitReview' }
   | { type: 'content'; content: Content }
@@ -57,6 +57,7 @@ export type PipelineAction =
   | { type: 'addImage'; image: ContentImage; sceneIndex: number }
   | { type: 'audio'; patch: Partial<AudioSettings> }
   | { type: 'videoQueued'; jobId: string }
+  | { type: 'videoFailed'; error: string; now: number }
 
 const idleSteps = (): Record<StepId, StepState> => ({
   1: { status: 'idle', message: '본문·이미지 대기' },
@@ -103,13 +104,13 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     }
 
     case 'stepStart':
-      return setStep(state, action.step, { status: 'running', message: action.message, startedAt: action.now, endedAt: undefined })
+      return setStep(state, action.step, { status: 'running', message: action.message, error: undefined, startedAt: action.now, endedAt: undefined })
 
     case 'stepDone':
       return setStep(state, action.step, { status: 'done', message: action.message, endedAt: action.now })
 
     case 'stepFail': {
-      const next = setStep(state, action.step, { status: 'error', message: action.message, endedAt: action.now })
+      const next = setStep(state, action.step, { status: 'error', message: '실패', error: action.error, endedAt: action.now })
       return { ...next, phase: next.scenes.length ? 'review' : 'stopped' }
     }
 
@@ -149,6 +150,11 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         jobId: action.jobId,
         phase: 'review',
       }
+
+    case 'videoFailed': {
+      const next = setStep(state, 5, { status: 'error', message: '실패', error: action.error, endedAt: action.now })
+      return { ...next, jobId: null }
+    }
 
     case 'moveScene': {
       const to = action.index + action.delta

@@ -54,7 +54,7 @@ def test_get_asset_not_found():
         )
 
     assert response.status_code == 404
-    assert response.json()["detail"]["code"] == "NOT_FOUND"
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 # 3. 잘못된 UUID 형식

@@ -1,4 +1,5 @@
 
+import logging
 from pathlib import Path
 from uuid import uuid4
 
@@ -7,10 +8,13 @@ from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from fastapi import Response
 
+from app.core.errors import classify_error
 from app.schemas.video import VideoCreateRequest
 from app.services.video_pipeline import generate_video
 from app.services.storage import get_asset
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -25,6 +29,17 @@ class VideoCreateResponse(BaseModel):
     job_id: str
     status: str
     status_url: str
+
+
+class VideoJobError(BaseModel):
+    code: str
+    message: str
+
+
+class VideoStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    error: VideoJobError | None = None
 
 
 async def run_video_job(
@@ -52,8 +67,18 @@ async def run_video_job(
         video_jobs[job_id]["output_path"] = str(output_path)
 
     except Exception as exc:
+        logger.exception("영상 생성 실패: %s", job_id)
+        error = classify_error(exc)
         video_jobs[job_id]["status"] = "failed"
-        video_jobs[job_id]["error"] = str(exc)
+        video_jobs[job_id]["error"] = (
+            # 파이프라인이 직접 올린 예외는 메시지가 곧 실패 원인이다.
+            VideoJobError(
+                code="RENDER_FAILED",
+                message=f"영상 생성에 실패했습니다: {exc}",
+            )
+            if error.code == "INTERNAL_ERROR"
+            else VideoJobError(code=error.code, message=error.message)
+        )
 
 
 @router.post(
@@ -105,6 +130,25 @@ async def create_video(
         status_url=f"/api/v1/videos/{job_id}",
     )
 
+
+
+@router.get("/{job_id}", response_model=VideoStatusResponse)
+async def read_video_status(job_id: str):
+    """영상 생성 작업의 상태와 실패 원인을 돌려준다."""
+
+    job = video_jobs.get(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="영상 작업을 찾을 수 없습니다.",
+        )
+
+    return VideoStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        error=job["error"],
+    )
 
 
 @router.head("/{job_id}/download")

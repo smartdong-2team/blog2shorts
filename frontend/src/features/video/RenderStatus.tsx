@@ -28,7 +28,7 @@ export function RenderStatus({ phase, steps, stepElapsed, onCancel }: RenderStat
     message = `${running}단계 ${STEP_TITLES[running]} 진행 중 · 경과 ${formatSec(total)}`
   } else if (failed) {
     tone = 'danger'
-    message = `${failed}단계 ${STEP_TITLES[failed]}에서 멈췄습니다 · ${steps[failed].message}`
+    message = `${failed}단계 ${STEP_TITLES[failed]}에서 멈췄습니다 · ${steps[failed].error}`
   } else if (cancelled) {
     tone = 'danger'
     message = `중지했습니다 · ${formatSec(total)} 진행`
