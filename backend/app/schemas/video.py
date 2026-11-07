@@ -22,6 +22,13 @@ from app.schemas.audio import AudioAsset, SubtitleCue
 # 백엔드 내부에서 FFmpeg로 영상을 합성할 때 사용하는 모델.
 # 외부 API 요청/응답과는 구분한다.
 
+Motion = Literal[
+    "zoom_in",
+    "zoom_out",
+    "pan_left",
+    "pan_right",
+]
+
 
 class VideoSettings(BaseModel):
     """영상 출력 설정: 해상도, FPS, 이미지 배치 방식."""
@@ -36,9 +43,12 @@ class RenderScene(BaseModel):
     """렌더링할 개별 장면의 이미지, 음성, 자막 데이터."""
 
     order: int = Field(ge=1)
+    narration: str = Field(min_length=1)
     image_path: Path
     audio: AudioAsset
     subtitles: list[SubtitleCue] = Field(default_factory=list)
+    # 장면 이미지 모션
+    motion: Motion = "zoom_in"
 
 
 class VideoRenderRequest(BaseModel):
@@ -47,6 +57,13 @@ class VideoRenderRequest(BaseModel):
     scenes: list[RenderScene] = Field(min_length=1)
     output_path: Path
     settings: VideoSettings = Field(default_factory=VideoSettings)
+
+    # 영상 상단 고정 훅 문구
+    hook_text: str = Field(
+        default="",
+        max_length=40,
+        description="영상 전체에 고정 표시할 훅 문구",
+    )
 
     @model_validator(mode="after")
     def validate_scene_order(self):
@@ -87,6 +104,8 @@ class VideoSceneInput(BaseModel):
     narration: str = Field(min_length=1)
     caption: str = Field(min_length=1)
     asset_id: UUID
+    # 프론트엔드에서 선택한 모션
+    motion: Motion = "zoom_in"
 
     @model_validator(mode="after")
     def validate_text(self):
@@ -105,6 +124,11 @@ class VideoCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenes: list[VideoSceneInput] = Field(min_length=1)
+    hook_text: str = Field(
+        default="",
+        max_length=40,
+        description="영상 상단에 고정 표시할 훅 문구",
+    )
     voice: None = None
 
     @model_validator(mode="after")

@@ -1,3 +1,5 @@
+import type { Motion } from "../features/pipeline/types"
+
 export interface HealthResponse {
   status: 'ok'
   app_env: string
@@ -45,6 +47,7 @@ export interface ScriptGenerateResponse {
   summary: ScriptSummary
   scenes: ScriptScene[]
   estimated_duration_sec: number
+  hook_text: string
 }
 
 
@@ -79,8 +82,10 @@ export interface VideoCreateRequest {
     narration: string
     caption: string
     asset_id: string
+    motion: Motion
   }[]
   voice: string | null
+  hook_text?: string
 }
 
 export interface VideoCreateResponse {

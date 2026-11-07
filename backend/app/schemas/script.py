@@ -136,6 +136,15 @@ class ScriptAIOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: ScriptSummary
+
+    # 쇼츠에는 상단에 항상 표시되는 훅 문구가 필요합니다. 
+    # 기존에는 나레이션 자체를 hook , body, cta로 구분했지만 
+    # hook_text를 별도로 두어 영상 상단에 고정 표시되는 훅 문구를 제공합니다.
+    hook_text: str = Field(
+        min_length=1,
+        max_length=40,
+        description="영상 상단에 고정 표시할 훅 문구",
+    )
     scenes: list[ScriptScene] = Field(
         min_length=4,
         max_length=6,
@@ -204,6 +213,9 @@ class ScriptOutputFormat(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: ScriptSummary
+    hook_text: str = Field(
+        description="영상 전체에 고정 표시할 짧은 훅 문구",
+    )
     scenes: list[ScriptOutputScene]
 
 

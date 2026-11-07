@@ -9,7 +9,8 @@ import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec } f
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
-// import { LoaderCircle } from 'lucide-react'
+import styles from './SceneList.module.css'
+import { TextField } from '../../components/common/TextField'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
 
@@ -27,7 +28,7 @@ interface SceneListProps {
 /** 3단계 결과 확인·수정 + 4단계 음성·음악 설정 + 영상 만들기 */
 export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSource, onLocate, onRender }: SceneListProps) {
   const [picking, setPicking] = useState<number | null>(null)
-  const { scenes, content, summary, audio, result } = state
+  const { scenes, content, summary, audio, result, hookText } = state
 
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
   const sec = estimateSec(scenes)
@@ -40,6 +41,27 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
     : result || state.steps[5].status !== 'idle'
       ? '영상 다시 만들기'
       : '영상 만들기'
+
+
+
+      // 최종적으로 프론트엔드에서 사용자가 만든 데이터가 잘 들어가는지 확인하기 위한 용도
+  // const inspectRenderData = () => {
+  //   const payload = {
+  //     hookText,
+  //     scenes: scenes.map((scene, index) => ({
+  //       order: index + 1,
+  //       role: scene.role,
+  //       narration: scene.narration,
+  //       caption: scene.caption,
+  //       asset_id: scene.asset_id,
+  //       motion: scene.motion,
+  //     })),
+  //     audio,
+  //   }
+
+  //   console.log('최종 영상 제작 데이터:', payload)
+  //   console.log(JSON.stringify(payload, null, 2))
+  // }
 
   return (
     <Card
@@ -71,6 +93,32 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
       </Stack>
 
       <div>
+        <Text variant="small">
+          영상 상단 훅 문구
+        </Text>
+
+        <TextField
+          ariaLabel="영상 상단 훅 문구"
+          placeholder="영상 상단에 표시할 훅 문구를 입력해 주세요"
+          value={hookText}
+          maxLength={40}
+          multiline
+          rows={2}
+          disabled={locked}
+          onChange={(event) =>
+            dispatch({
+              type: 'hookText',
+              hookText: event.target.value,
+            })
+          }
+        />
+
+        <Text variant="caption" tone="muted">
+          모든 장면에 공통으로 표시되는 문구 · {hookText.length}/40자
+        </Text>
+      </div>
+
+      <div className={styles.sceneList}>
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
@@ -78,6 +126,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
             index={index}
             total={scenes.length}
             imageUrl={imageUrl(scene.asset_id)}
+            hookText={hookText}
             locked={locked}
             canRemove={scenes.length > MIN_SCENES}
             onChange={(patch) => dispatch({ type: 'editScene', index, patch })}
@@ -85,6 +134,22 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
             onRemove={() => dispatch({ type: 'removeScene', index })}
             onPickImage={() => setPicking(index)}
             onLocate={() => scene.asset_id && onLocate(scene.asset_id)}
+            onSplit={(before, after) =>
+              dispatch({
+                type: 'splitScene',
+                index,
+                before,
+                after,
+              })
+            }
+
+            onMergePrevious={() =>
+              dispatch({
+                type: 'mergeScenePrevious',
+                index,
+              })
+            }
+
           />
         ))}
       </div>
@@ -104,6 +169,14 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
           </Text>
         )}
 
+
+        {/* <Button
+          variant="ghost"
+          onClick={inspectRenderData}
+          disabled={locked}
+        >
+          최종 데이터 확인
+        </Button> */}
         <Button
           onClick={onRender}
           loading={isRendering}

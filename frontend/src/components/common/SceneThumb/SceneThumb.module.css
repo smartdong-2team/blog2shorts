@@ -1,13 +1,13 @@
 .thumb {
   position: relative;
   display: block;
-  width: 120px;
+  width: 100%;
   aspect-ratio: 9 / 16;
   padding: 0;
   overflow: hidden;
   border: 0;
   border-radius: var(--radius-md);
-  background: var(--color-media-placeholder);
+  background: #000;
   cursor: pointer;
 }
 
@@ -20,7 +20,19 @@
   outline-offset: 2px;
 }
 
+/* 실제 영상에서 이미지가 표시되는 영역 */
+.imageArea {
+  position: absolute;
+  top: 30.2083%;
+  left: 0;
+  width: 100%;
+  height: 40.625%;
+  overflow: hidden;
+  background: var(--color-media-placeholder);
+}
+
 .image {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -39,16 +51,156 @@
 
 .band {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  padding: var(--space-4);
-  font-size: var(--font-size-caption);
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 12px 20px;
+
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
   text-align: center;
-  color: var(--color-surface);
-  background: var(--color-overlay);
+
+  color: #fff;
+  background: rgba(45, 45, 45, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .thumb:disabled .band {
   display: none;
+}
+
+.hookText {
+  position: absolute;
+  top: 10%;
+  left: 5%;
+  width: 90%;
+  z-index: 2;
+
+  color: #fff;
+  font-size: clamp(12px, 1.5vw, 24px);
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 2px #000,
+    0 2px 3px #000;
+}
+
+.subtitle {
+  position: absolute;
+  top: 66%;
+  left: 5%;
+  width: 90%;
+  z-index: 2;
+
+  padding: 6px 8px;
+  border-radius: 4px;
+
+  color: #fff;
+  background: rgba(0, 0, 0, 0.8);
+
+  font-size: clamp(11px, 1vw, 19px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.thumb:not(:disabled):hover .band {
+  background: rgba(65, 65, 65, 0.98);
+  transform: translateX(-50%) translateY(-4px);
+}
+
+.thumb:not(:disabled):hover .image {
+  filter: brightness(0.85);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 0.2s ease;
+}
+
+
+
+/* 이미지 움직임 미리보기 */
+
+.zoomIn {
+  animation: zoomInPreview 4s linear forwards;
+}
+
+.zoomOut {
+  animation: zoomOutPreview 4s linear forwards;
+}
+
+.panLeft {
+  animation: panLeftPreview 4s linear forwards;
+}
+
+.panRight {
+  animation: panRightPreview 4s linear forwards;
+}
+
+/* 확대 */
+@keyframes zoomInPreview {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.2);
+  }
+}
+
+/* 축소 */
+@keyframes zoomOutPreview {
+  from {
+    transform: scale(1.2);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* 왼쪽 이동 */
+@keyframes panLeftPreview {
+  from {
+    transform: scale(1.2) translateX(6%);
+  }
+  to {
+    transform: scale(1.2) translateX(-6%);
+  }
+}
+
+/* 오른쪽 이동 */
+@keyframes panRightPreview {
+  from {
+    transform: scale(1.2) translateX(-6%);
+  }
+  to {
+    transform: scale(1.2) translateX(6%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zoomIn,
+  .zoomOut,
+  .panLeft,
+  .panRight {
+    animation: none;
+  }
 }

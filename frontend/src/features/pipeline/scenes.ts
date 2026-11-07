@@ -1,7 +1,9 @@
 import type { Motion, Scene } from './types'
 
 export const MIN_SCENES = 4
-export const MAX_SCENES = 6
+
+// MAX_SCENES가 과연 꼭 필요할까? 일단은 6->30개로 만듦
+export const MAX_SCENES = 30
 export const TARGET_MIN_SEC = 30
 export const TARGET_MAX_SEC = 60
 

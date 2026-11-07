@@ -13,6 +13,7 @@ interface SceneCardProps {
   index: number
   total: number
   imageUrl: string | null
+  hookText: string
   locked: boolean
   canRemove: boolean
   onChange: (patch: Partial<Pick<Scene, 'narration' | 'caption' | 'motion'>>) => void
@@ -20,6 +21,8 @@ interface SceneCardProps {
   onRemove: () => void
   onPickImage: () => void
   onLocate: () => void
+  onSplit: (before: string, after: string) => void
+  onMergePrevious: () => void
 }
 
 export function SceneCard({
@@ -27,6 +30,7 @@ export function SceneCard({
   index,
   total,
   imageUrl,
+  hookText,
   locked,
   canRemove,
   onChange,
@@ -34,13 +38,23 @@ export function SceneCard({
   onRemove,
   onPickImage,
   onLocate,
+  onSplit,
+  onMergePrevious
 }: SceneCardProps) {
   const chars = scene.narration.replace(/\s/g, '').length
   const number = index + 1
 
   return (
     <div className={styles.scene}>
-      <SceneThumb src={imageUrl} onClick={onPickImage} disabled={locked} label={`장면 ${number} 이미지 변경`} />
+      <SceneThumb
+        src={imageUrl}
+        hookText={hookText}
+        subtitle={scene.narration}
+        onClick={onPickImage}
+        disabled={locked}
+        motion={scene.motion}
+        label={`장면 ${number} 이미지 변경`}
+      />
       <div className={styles.fields}>
         <div className={styles.top}>
           <RoleBadge role={scene.role} index={number} />
@@ -70,6 +84,32 @@ export function SceneCard({
           onChange={(event) => onChange({ narration: event.target.value })}
           disabled={locked}
           error={scene.narration.trim() ? undefined : '나레이션을 입력해 주세요'}
+          onKeyDown={(event) => {
+            if (locked || event.nativeEvent.isComposing) return
+
+            const textarea = event.currentTarget
+            const { selectionStart, selectionEnd, value } = textarea
+
+            if (event.key === 'Enter' && !event.shiftKey) {
+              const before = value.slice(0, selectionStart).trimEnd()
+              const after = value.slice(selectionEnd).trimStart()
+
+              if (!before || !after) return
+
+              event.preventDefault()
+              onSplit(before, after)
+            }
+
+            if (
+              event.key === 'Backspace' &&
+              selectionStart === 0 &&
+              selectionEnd === 0 &&
+              index > 0
+            ) {
+              event.preventDefault()
+              onMergePrevious()
+            }
+          }}
         />
         <Text variant="caption" tone="muted">
           {chars}자 · 약 {narrationSec(scene.narration).toFixed(1)}초
@@ -77,7 +117,7 @@ export function SceneCard({
       </div>
       <div className={styles.tools}>
         <Button variant="icon" aria-label={`장면 ${number} 위로`} onClick={() => onMove(-1)} disabled={locked || index === 0}>
-          ↑
+          ←
         </Button>
         <Button
           variant="icon"
@@ -85,7 +125,7 @@ export function SceneCard({
           onClick={() => onMove(1)}
           disabled={locked || index === total - 1}
         >
-          ↓
+          →
         </Button>
         <Button variant="icon" onClick={onRemove} disabled={locked || !canRemove}>
           삭제

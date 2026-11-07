@@ -3,6 +3,7 @@ import { Button } from '../../components/common/Button'
 import { Dialog } from '../../components/common/Dialog'
 import type { ContentImage } from '../pipeline/types'
 import styles from './ImagePicker.module.css'
+import { uploadImage } from '../../api/assets'
 
 interface ImagePickerProps {
   open: boolean
@@ -13,16 +14,22 @@ interface ImagePickerProps {
   onClose: () => void
 }
 
-let uploadSeq = 0
-
 /** 장면 이미지 고르기: 블로그 이미지 / 내 컴퓨터 이미지 / 이미지 없음 */
 export function ImagePicker({ open, images, current, onPick, onUpload, onClose }: ImagePickerProps) {
   // 백엔드 연결 전: 브라우저 안에서만 쓰는 임시 주소로 미리보기
-  const upload = (event: ChangeEvent<HTMLInputElement>) => {
+  const upload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
+
     if (!file) return
-    onUpload({ asset_id: `upload-${++uploadSeq}`, url: URL.createObjectURL(file), alt: file.name })
+
+    try {
+      const image = await uploadImage(file)
+      onUpload(image)
+    } catch (error) {
+      console.error('이미지 업로드 오류:', error)
+      alert('이미지 업로드에 실패했습니다.')
+    }
   }
 
   return (

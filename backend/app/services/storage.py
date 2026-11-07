@@ -162,3 +162,49 @@ def get_asset(asset_id: UUID) -> StoredAsset | None:
             )
 
     return None
+
+
+# 사용자가 업로드한 이미지를 저장하고 uuid를 반환하는 함수
+def save_uploaded_image(image_bytes: bytes) -> StoredAsset:
+    if not image_bytes:
+        raise ImageStorageError("이미지 파일이 비어 있습니다.")
+
+    if len(image_bytes) > MAX_IMAGE_SIZE:
+        raise ImageStorageError("이미지 용량이 10MB를 초과했습니다.")
+
+    try:
+        with Image.open(BytesIO(image_bytes)) as image:
+            image_format = image.format
+
+            if image_format not in ALLOWED_FORMATS:
+                raise ImageStorageError("지원하지 않는 이미지 형식입니다.")
+
+            image.verify()
+
+        with Image.open(BytesIO(image_bytes)) as image:
+            width, height = image.size
+
+            if width <= 0 or height <= 0:
+                raise ImageStorageError("이미지 크기가 올바르지 않습니다.")
+
+            if width * height > 40_000_000:
+                raise ImageStorageError("이미지 해상도가 너무 큽니다.")
+
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise ImageStorageError("올바른 이미지 파일이 아닙니다.") from exc
+
+    extension, media_type = ALLOWED_FORMATS[image_format]
+    asset_id = uuid4()
+
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+    file_path = STORAGE_DIR / f"{asset_id}.{extension}"
+    file_path.write_bytes(image_bytes)
+
+    return StoredAsset(
+        asset_id=asset_id,
+        path=file_path,
+        media_type=media_type,
+        width=width,
+        height=height,
+    )
