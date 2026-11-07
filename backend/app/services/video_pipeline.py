@@ -68,6 +68,11 @@ async def generate_video(
 
     render_scenes = []
 
+    motion_by_order = {
+        scene.order: scene.motion
+        for scene in request.scenes
+    }
+
     for scene in audio_result.scenes:
         render_scenes.append(
             RenderScene(
@@ -75,6 +80,7 @@ async def generate_video(
                 image_path=image_paths[UUID(scene.asset_id)],
                 audio=scene.audio,
                 subtitles=scene.subtitles,
+                motion=motion_by_order[scene.order],
             )
         )
 

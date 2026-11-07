@@ -1,3 +1,5 @@
+import type { Motion } from "../features/pipeline/types"
+
 export interface HealthResponse {
   status: 'ok'
   app_env: string
@@ -80,6 +82,7 @@ export interface VideoCreateRequest {
     narration: string
     caption: string
     asset_id: string
+    motion: Motion
   }[]
   voice: string | null
   hook_text?: string

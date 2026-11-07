@@ -168,6 +168,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         narration: scene.narration,
         caption: scene.caption,
         asset_id: scene.asset_id!,
+        motion: scene.motion,
       })),
       voice: null,
       hook_text: hookText,

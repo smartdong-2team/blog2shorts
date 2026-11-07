@@ -235,6 +235,83 @@ def build_hook_filter(hook_text: str) -> str:
 
     return ",".join(filters)
 # 단일 씬 생성 함수
+
+
+
+# 모션 필터
+def build_motion_filter(
+    motion: str,
+    duration_sec: float,
+    fps: int,
+    motion_duration_sec: float = 1.2,
+) -> str:
+    """장면 시작 시 짧게 움직이고 마지막 위치에서 정지한다."""
+
+    total_frames = max(1, round(duration_sec * fps))
+
+    motion_frames = max(
+        1,
+        min(round(motion_duration_sec * fps), total_frames - 1)
+    )
+
+    work_width = IMAGE_WIDTH * 2
+    work_height = IMAGE_HEIGHT * 2
+
+    base = (
+        f"scale={work_width}:{work_height}:"
+        "force_original_aspect_ratio=increase,"
+        f"crop={work_width}:{work_height},"
+        "setsar=1"
+    )
+
+    # 0~1.2초 동안 0→1, 이후에는 1로 고정
+    progress = f"min(on/{motion_frames},1)"
+
+    # 부드럽게 시작하고 멈추는 ease-in-out
+    eased = f"({progress}*{progress}*(3-2*{progress}))"
+
+    # 모션 강도 설정
+    ZOOM_AMOUNT = 0.06   # 확대·축소 6%
+    PAN_ZOOM = 1.08      # 좌우 이동 시 여백 확보용 확대
+    PAN_AMOUNT = 0.30    # 이동 가능한 범위의 30%만 이동
+
+    if motion == "zoom_in":
+        zoom = f"1+{ZOOM_AMOUNT}*{eased}"
+        x = "iw/2-iw/zoom/2"
+        y = "ih/2-ih/zoom/2"
+
+    elif motion == "zoom_out":
+        zoom = f"1+{ZOOM_AMOUNT}*(1-{eased})"
+        x = "iw/2-iw/zoom/2"
+        y = "ih/2-ih/zoom/2"
+
+    elif motion == "pan_left":
+        zoom = str(PAN_ZOOM)
+        x = f"(iw-iw/zoom)*(0.5+{PAN_AMOUNT}/2-{PAN_AMOUNT}*{eased})"
+        y = "ih/2-ih/zoom/2"
+
+    elif motion == "pan_right":
+        zoom = str(PAN_ZOOM)
+        x = f"(iw-iw/zoom)*(0.5-{PAN_AMOUNT}/2+{PAN_AMOUNT}*{eased})"
+        y = "ih/2-ih/zoom/2"
+
+    else:
+        raise ValueError(f"지원하지 않는 모션: {motion}")
+
+    return (
+        f"{base},"
+        f"zoompan="
+        f"z='{zoom}':"
+        f"x='{x}':"
+        f"y='{y}':"
+        f"d=1:"
+        f"s={work_width}x{work_height}:"
+        f"fps={fps},"
+        f"scale={IMAGE_WIDTH}:{IMAGE_HEIGHT}:flags=lanczos,"
+        "setsar=1"
+    )
+
+
 async def render_scene(
     scene: RenderScene,
     output_path: Path,
@@ -272,11 +349,18 @@ async def render_scene(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    motion = getattr(scene, "motion", "zoom_in")
+
+    motion_filter = build_motion_filter(
+        motion=motion,
+        duration_sec=scene.audio.duration_sec,
+        fps=settings.fps,
+    )
+
     image_filter = (
-        f"scale={IMAGE_WIDTH}:{IMAGE_HEIGHT}:"
-        "force_original_aspect_ratio=increase,"
-        f"crop={IMAGE_WIDTH}:{IMAGE_HEIGHT},"
-        f"pad={settings.width}:{settings.height}:0:{IMAGE_Y}:black,"
+        f"{motion_filter},"
+        f"pad={settings.width}:{settings.height}:"
+        f"0:{IMAGE_Y}:black,"
         "setsar=1"
     )
 
