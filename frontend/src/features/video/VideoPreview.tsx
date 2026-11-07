@@ -7,6 +7,7 @@ import { audioSummary } from '../audio/options'
 import type { PipelineState } from '../pipeline/pipelineReducer'
 import { formatSec } from '../pipeline/scenes'
 import type { StepId } from '../pipeline/types'
+import { useVideoDownload } from './useVideoDownload'
 
 export const RESULT_ID = 'video-result'
 
@@ -21,8 +22,14 @@ interface VideoPreviewProps {
 }
 
 /** 5단계 결과. 백엔드 연결 전에는 검은 9:16 화면 */
-export function VideoPreview({ state, stepElapsed, stale, onEdit }: VideoPreviewProps) {
+export function VideoPreview({
+  state,
+  stepElapsed,
+  stale,
+  onEdit,
+}: VideoPreviewProps) {
   const { result, scenes, audio } = state
+  const { download, downloading } = useVideoDownload()
   if (!result) return null
 
   const sum = (ids: StepId[]) => ids.reduce((s, id) => s + (stepElapsed(id) ?? 0), 0)
@@ -52,7 +59,17 @@ export function VideoPreview({ state, stepElapsed, stale, onEdit }: VideoPreview
             </Text>
           )}
           <Stack direction="row" gap={8} wrap>
-            <Button disabled={!result.download_url}>mp4 다운로드</Button>
+            <Button
+              onClick={() => {
+                if (result.download_url) {
+                  download(result.download_url)
+                }
+              }}
+              loading={downloading}
+              disabled={!result.download_url}
+            >
+              {downloading ? '다운로드 준비 중...' : 'MP4 다운로드'}
+            </Button>
             <Button variant="ghost" onClick={onEdit}>
               장면 다시 수정하기
             </Button>
