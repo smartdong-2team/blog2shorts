@@ -17,7 +17,7 @@ export const STEP_TITLES: Record<StepId, string> = {
   1: '컨텐츠 가져오기',
   2: '대본 구상하기',
   3: '장면',
-  4: '음성과 음악',
+  4: '편집',
   5: '영상 제작',
 }
 
@@ -100,7 +100,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       if (action.phase === 'analyzing') return { ...initialPipeline, mode: state.mode, audio: state.audio, phase: 'analyzing' }
       // 4~5단계만 다시: 이전 결과를 지우고 두 단계를 대기로
       const steps = { ...state.steps, 4: idleSteps()[4], 5: idleSteps()[5] }
-      return { ...state, phase: 'rendering', steps, result: null,jobId: null, }
+      return { ...state, phase: 'rendering', steps, result: null, jobId: null, }
     }
 
     case 'stepStart':
@@ -144,16 +144,29 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         ...state,
         scenes: state.scenes.map((s, i) => (i === action.index ? { ...s, ...action.patch } : s)),
       }
+
+      // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
     case 'videoQueued':
       return {
         ...state,
         jobId: action.jobId,
-        phase: 'review',
+        phase: 'rendering',
       }
 
+      // 영상 제작 실패
     case 'videoFailed': {
-      const next = setStep(state, 5, { status: 'error', message: '실패', error: action.error, endedAt: action.now })
-      return { ...next, jobId: null }
+      const next = setStep(state, 5, {
+        status: 'error',
+        message: '실패',
+        error: action.error,
+        endedAt: action.now,
+      })
+
+      return {
+        ...next,
+        phase: 'review',
+        jobId: null,
+      }
     }
 
     case 'moveScene': {

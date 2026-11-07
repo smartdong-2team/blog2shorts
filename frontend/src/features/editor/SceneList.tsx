@@ -9,6 +9,7 @@ import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec } f
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
+// import { LoaderCircle } from 'lucide-react'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
 
@@ -32,7 +33,13 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
   const sec = estimateSec(scenes)
   const inRange = sec >= TARGET_MIN_SEC && sec <= TARGET_MAX_SEC
   const emptyScene = scenes.findIndex((s) => !s.narration.trim())
-  const renderLabel = result || state.steps[5].status !== 'idle' ? '영상 다시 만들기' : '영상 만들기'
+  const isRendering = state.phase === 'rendering'
+
+  const renderLabel = isRendering
+    ? '영상 제작 중...'
+    : result || state.steps[5].status !== 'idle'
+      ? '영상 다시 만들기'
+      : '영상 만들기'
 
   return (
     <Card
@@ -96,7 +103,12 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
             {emptyScene + 1}번 장면 나레이션이 비어 있습니다
           </Text>
         )}
-        <Button onClick={onRender} disabled={locked || emptyScene >= 0}>
+
+        <Button
+          onClick={onRender}
+          loading={isRendering}
+          disabled={locked || isRendering || emptyScene >= 0}
+        >
           {renderLabel}
         </Button>
       </Stack>

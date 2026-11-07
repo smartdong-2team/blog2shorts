@@ -3,6 +3,9 @@ import asyncio
 import tempfile
 from pathlib import Path
 import time
+import os
+
+
 
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
@@ -10,6 +13,8 @@ from app.schemas.video import (
     VideoRenderRequest,
     VideoRenderResult,
 )
+
+FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
 
 
 class VideoRenderingError(Exception):
@@ -176,7 +181,7 @@ async def render_scene(
 
     print("[DEBUG] FFmpeg 명령어 생성 시작", flush=True)
     command = [
-        "ffmpeg",
+        FFMPEG_BIN,
         "-y",
         "-loop", "1",
         "-framerate", str(settings.fps),
@@ -312,7 +317,7 @@ async def render_video(
 
         # 3. 장면 영상 연결
         command = [
-            "ffmpeg",
+            FFMPEG_BIN,
             "-y",
             "-f", "concat",
             "-safe", "0",
