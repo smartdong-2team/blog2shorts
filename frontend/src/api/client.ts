@@ -23,28 +23,53 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
   )
 }
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const isFormData = init?.body instanceof FormData
+
+  const headers = new Headers(init?.headers)
+
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json')
+  }
+
+  if (init?.body && !isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   let response: Response
+
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: {
-        Accept: 'application/json',
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-        ...init?.headers,
-      },
+      headers,
     })
   } catch {
-    throw new ApiError(0, 'NETWORK_ERROR', '서버에 연결할 수 없습니다.')
+    throw new ApiError(
+      0,
+      'NETWORK_ERROR',
+      '서버에 연결할 수 없습니다.',
+    )
   }
 
   const body: unknown = await response.json().catch(() => null)
 
   if (!response.ok) {
     if (isApiErrorBody(body)) {
-      throw new ApiError(response.status, body.error.code, body.error.message)
+      throw new ApiError(
+        response.status,
+        body.error.code,
+        body.error.message,
+      )
     }
-    throw new ApiError(response.status, 'HTTP_ERROR', `요청이 실패했습니다. (HTTP ${response.status})`)
+
+    throw new ApiError(
+      response.status,
+      'HTTP_ERROR',
+      `요청이 실패했습니다. (HTTP ${response.status})`,
+    )
   }
 
   return body as T
