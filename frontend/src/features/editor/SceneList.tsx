@@ -10,6 +10,7 @@ import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
 import styles from './SceneList.module.css'
+import { TextField } from '../../components/common/TextField'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
 
@@ -69,6 +70,32 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
           장면 {scenes.length}개 ({MIN_SCENES}~{MAX_SCENES}개)
         </Text>
       </Stack>
+
+      <div>
+        <Text variant="small">
+          영상 상단 훅 문구
+        </Text>
+
+        <TextField
+          ariaLabel="영상 상단 훅 문구"
+          placeholder="영상 상단에 표시할 훅 문구를 입력해 주세요"
+          value={hookText}
+          maxLength={40}
+          multiline
+          rows={2}
+          disabled={locked}
+          onChange={(event) =>
+            dispatch({
+              type: 'hookText',
+              hookText: event.target.value,
+            })
+          }
+        />
+
+        <Text variant="caption" tone="muted">
+          모든 장면에 공통으로 표시되는 문구 · {hookText.length}/40자
+        </Text>
+      </div>
 
       <div className={styles.sceneList}>
         {scenes.map((scene, index) => (

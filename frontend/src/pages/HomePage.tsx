@@ -22,7 +22,7 @@ import { scrollToElement } from '../utils/scroll'
 
 export function HomePage() {
   const { toasts, showToast, dismissToast, clearToasts } = useToast()
-  const { state, dispatch, running, start, render, cancel, stepElapsed, stale} = usePipeline({
+  const { state, dispatch, running, start, render, cancel, stepElapsed, stale } = usePipeline({
     onError: showToast,
     onRunStart: clearToasts,
   })
@@ -58,6 +58,7 @@ export function HomePage() {
       />
 
       <RenderStatus phase={state.phase} steps={state.steps} stepElapsed={stepElapsed} onCancel={cancel} />
+
 
       <Grid columns={5} compactColumns={3}>
         {STEP_IDS.map((id) => {

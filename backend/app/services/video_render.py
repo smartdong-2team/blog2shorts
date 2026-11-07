@@ -150,7 +150,7 @@ def build_subtitle_filter(
 
 # 훅 필터
 def build_hook_filter(hook_text: str) -> str:
-    """영상 상단 훅을 최대 2줄로 나누어 중앙 정렬한다."""
+    """사용자가 입력한 줄바꿈을 유지하며 영상 상단에 훅을 표시한다."""
 
     if not hook_text or not hook_text.strip():
         return ""
@@ -163,35 +163,43 @@ def build_hook_filter(hook_text: str) -> str:
             f"훅 폰트 파일을 찾을 수 없습니다: {font_file}"
         )
 
-    import textwrap
-
-    # AI가 넣은 줄바꿈을 우선 사용
-    original_lines = [
+    # 사용자가 입력한 줄바꿈 유지
+    lines = [
         line.strip()
         for line in hook_text.splitlines()
         if line.strip()
     ]
 
-    # 한 줄이 너무 길면 자동 줄바꿈
-    lines = []
-    for line in original_lines:
-        lines.extend(
-            textwrap.wrap(
-                line,
-                width=12,
-                break_long_words=True,
-                break_on_hyphens=False,
-            )
+    # 줄바꿈이 없는 긴 문장만 자동 분할
+    if len(lines) == 1 and len(lines[0]) > 16:
+        import textwrap
+
+        lines = textwrap.wrap(
+            lines[0],
+            width=16,
+            break_long_words=False,
+            break_on_hyphens=False,
         )
 
-    # 최대 2줄로 재구성
-    if len(lines) > 2:
-        midpoint = (len(hook_text.replace("\n", "")) + 1) // 2
-        clean_text = " ".join(original_lines)
-        lines = [
-            clean_text[:midpoint].strip(),
-            clean_text[midpoint:].strip(),
-        ]
+
+    # 가장 긴 줄을 기준으로 글자 크기 조절
+    max_length = max(len(line) for line in lines)
+
+    if max_length > 20:
+        fontsize = 58
+    elif max_length > 16:
+        fontsize = 68
+    else:
+        fontsize = 80
+
+    line_height = int(fontsize * 1.3)
+
+    # 상단 영역 중앙 부근에 배치
+    # 상단 훅 영역의 중앙을 기준으로 배치
+    hook_center_y = 290
+
+    total_height = (len(lines) - 1) * line_height + fontsize
+    start_y = int(hook_center_y - total_height / 2)
 
     font = (
         str(font_file)
@@ -200,10 +208,6 @@ def build_hook_filter(hook_text: str) -> str:
     )
 
     filters = []
-
-    fontsize = 80
-    line_height = 105
-    start_y = 240
 
     for index, line in enumerate(lines):
         text = (
@@ -230,7 +234,6 @@ def build_hook_filter(hook_text: str) -> str:
         )
 
     return ",".join(filters)
-
 # 단일 씬 생성 함수
 async def render_scene(
     scene: RenderScene,
