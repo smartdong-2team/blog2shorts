@@ -26,7 +26,7 @@ export function HomePage() {
     onError: showToast,
     onRunStart: clearToasts,
   })
-  const [sourceVisible, setSourceVisible] = useState(true)
+  const [sourceVisible, setSourceVisible] = useState(false)
   const [highlight, setHighlight] = useState<{ assetId: string; n: number } | null>(null)
   const { state: health, retry } = useHealthCheck()
 
