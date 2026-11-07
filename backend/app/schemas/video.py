@@ -48,6 +48,13 @@ class VideoRenderRequest(BaseModel):
     output_path: Path
     settings: VideoSettings = Field(default_factory=VideoSettings)
 
+    # 영상 상단 고정 훅 문구
+    hook_text: str = Field(
+        default="",
+        max_length=40,
+        description="영상 전체에 고정 표시할 훅 문구",
+    )
+
     @model_validator(mode="after")
     def validate_scene_order(self):
         orders = [scene.order for scene in self.scenes]
@@ -105,6 +112,11 @@ class VideoCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenes: list[VideoSceneInput] = Field(min_length=1)
+    hook_text: str = Field(
+        default="",
+        max_length=40,
+        description="영상 상단에 고정 표시할 훅 문구",
+    )
     voice: None = None
 
     @model_validator(mode="after")

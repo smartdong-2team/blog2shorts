@@ -81,6 +81,7 @@ async def generate_video(
     render_request = VideoRenderRequest(
         scenes=render_scenes,
         output_path=output_path,
+        hook_text=request.hook_text,
     )
 
     print(

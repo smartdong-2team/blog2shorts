@@ -29,6 +29,7 @@ export interface PipelineState {
   steps: Record<StepId, StepState>
   content: Content | null
   summary: ScriptSummary | null
+  hookText: string
   scenes: Scene[]
   audio: AudioSettings
   result: RenderResult | null
@@ -48,6 +49,7 @@ export type PipelineAction =
   | { type: 'waitReview' }
   | { type: 'content'; content: Content }
   | { type: 'summary'; summary: ScriptSummary }
+  | { type: 'hookText'; hookText: string }
   | { type: 'scenes'; scenes: Scene[] }
   | { type: 'rendered'; result: RenderResult; renderedWith: string }
   | { type: 'editScene'; index: number; patch: Partial<Omit<Scene, 'id' | 'role'>> }
@@ -73,6 +75,7 @@ export const initialPipeline: PipelineState = {
   steps: idleSteps(),
   content: null,
   summary: null,
+  hookText: '',
   scenes: [],
   audio: DEFAULT_AUDIO,
   result: null,
@@ -133,6 +136,9 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     case 'summary':
       return { ...state, summary: action.summary }
 
+    case 'hookText':
+      return { ...state, hookText: action.hookText }
+
     case 'scenes':
       return { ...state, scenes: assignRoles(action.scenes) }
 
@@ -145,7 +151,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         scenes: state.scenes.map((s, i) => (i === action.index ? { ...s, ...action.patch } : s)),
       }
 
-      // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
+    // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
     case 'videoQueued':
       return {
         ...state,
@@ -153,7 +159,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         phase: 'rendering',
       }
 
-      // 영상 제작 실패
+    // 영상 제작 실패
     case 'videoFailed': {
       const next = setStep(state, 5, {
         status: 'error',

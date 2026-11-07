@@ -45,6 +45,7 @@ export interface ScriptGenerateResponse {
   summary: ScriptSummary
   scenes: ScriptScene[]
   estimated_duration_sec: number
+  hook_text: string
 }
 
 
@@ -81,6 +82,7 @@ export interface VideoCreateRequest {
     asset_id: string
   }[]
   voice: string | null
+  hook_text?: string
 }
 
 export interface VideoCreateResponse {

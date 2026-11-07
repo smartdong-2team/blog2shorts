@@ -14,12 +14,22 @@ from app.schemas.video import (
     VideoRenderResult,
 )
 
+# 로고 이미지 경로
+LOGO_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "branding"
+    / "company_logo.png"
+)
+
 FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
 
 # 쇼츠 이미지 레이아웃
 IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 780
 IMAGE_Y = 580
+
+
 
 
 class VideoRenderingError(Exception):
@@ -67,7 +77,7 @@ def normalize_subtitles(
     return normalized
 
 
-# FFmpeg drawtext 필터 생성
+# 자막 필터
 def build_subtitle_filter(
     subtitles: list[SubtitleCue],
 ) -> str:
@@ -138,6 +148,89 @@ def build_subtitle_filter(
     return ",".join(filters)
 
 
+# 훅 필터
+def build_hook_filter(hook_text: str) -> str:
+    """영상 상단 훅을 최대 2줄로 나누어 중앙 정렬한다."""
+
+    if not hook_text or not hook_text.strip():
+        return ""
+
+    style = SUBTITLE_STYLES["default"]
+    font_file = Path(style["font_file"])
+
+    if not font_file.is_file():
+        raise FileNotFoundError(
+            f"훅 폰트 파일을 찾을 수 없습니다: {font_file}"
+        )
+
+    import textwrap
+
+    # AI가 넣은 줄바꿈을 우선 사용
+    original_lines = [
+        line.strip()
+        for line in hook_text.splitlines()
+        if line.strip()
+    ]
+
+    # 한 줄이 너무 길면 자동 줄바꿈
+    lines = []
+    for line in original_lines:
+        lines.extend(
+            textwrap.wrap(
+                line,
+                width=12,
+                break_long_words=True,
+                break_on_hyphens=False,
+            )
+        )
+
+    # 최대 2줄로 재구성
+    if len(lines) > 2:
+        midpoint = (len(hook_text.replace("\n", "")) + 1) // 2
+        clean_text = " ".join(original_lines)
+        lines = [
+            clean_text[:midpoint].strip(),
+            clean_text[midpoint:].strip(),
+        ]
+
+    font = (
+        str(font_file)
+        .replace("\\", r"\\")
+        .replace(":", r"\:")
+    )
+
+    filters = []
+
+    fontsize = 80
+    line_height = 105
+    start_y = 240
+
+    for index, line in enumerate(lines):
+        text = (
+            line
+            .replace("\\", r"\\")
+            .replace(":", r"\:")
+            .replace("'", r"\'")
+            .replace(",", r"\,")
+            .replace("%", r"\%")
+        )
+
+        y = start_y + index * line_height
+
+        filters.append(
+            "drawtext="
+            f"fontfile='{font}':"
+            f"text='{text}':"
+            "fontcolor=white:"
+            f"fontsize={fontsize}:"
+            "borderw=4:"
+            "bordercolor=black:"
+            "x=(w-text_w)/2:"
+            f"y={y}"
+        )
+
+    return ",".join(filters)
+
 # 단일 씬 생성 함수
 async def render_scene(
     scene: RenderScene,
@@ -145,6 +238,7 @@ async def render_scene(
     settings: VideoSettings | None = None,
     scene_start_sec: float = 0.0,
     font_file: Path | None = None,
+    hook_text: str = "",
 ) -> Path:
 
     """이미지와 음성을 합성하여 단일 장면 MP4를 생성한다.
@@ -168,6 +262,11 @@ async def render_scene(
             f"음성 파일을 찾을 수 없습니다: {audio_path}"
         )
 
+    if not LOGO_PATH.is_file():
+        raise FileNotFoundError(
+            f"로고 파일을 찾을 수 없습니다: {LOGO_PATH}"
+        )
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     image_filter = (
@@ -177,6 +276,13 @@ async def render_scene(
         f"pad={settings.width}:{settings.height}:0:{IMAGE_Y}:black,"
         "setsar=1"
     )
+
+    # 상단 고정 훅 추가
+    if hook_text:
+        hook_filter = build_hook_filter(hook_text)
+
+        if hook_filter:
+            image_filter = f"{image_filter},{hook_filter}"
 
     
     print("[DEBUG] 자막 시간 계산 시작", flush=True)
@@ -195,7 +301,16 @@ async def render_scene(
 
         image_filter = f"{image_filter},{subtitle_filter}"
 
-    print("[DEBUG] FFmpeg 명령어 생성 시작", flush=True)
+    # 로고추가하는 부분
+    filter_complex = (
+        f"[0:v]{image_filter}[base];"
+        "[2:v]format=rgba,scale=500:-1[logo];"
+        "[base][logo]overlay="
+        "x=(W-w)/2:"
+        "y=H-h-320:"
+        "format=auto,"
+        "format=yuv420p[outv]"
+    )
     command = [
         FFMPEG_BIN,
         "-y",
@@ -203,7 +318,16 @@ async def render_scene(
         "-framerate", str(settings.fps),
         "-i", str(image_path),
         "-i", str(audio_path),
-        "-vf", image_filter,
+
+        # 로고 이미지 입력
+        "-loop", "1",
+        "-framerate", str(settings.fps),
+        "-i", str(LOGO_PATH),
+
+        "-filter_complex", filter_complex,
+        "-map", "[outv]",
+        "-map", "1:a:0",
+
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
@@ -309,6 +433,7 @@ async def render_video(
                 settings=request.settings,
                 scene_start_sec=scene_start_sec,
                 font_file=font_file,
+                hook_text=request.hook_text,
             )
 
             print(

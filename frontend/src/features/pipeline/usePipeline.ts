@@ -159,6 +159,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
   const runRender = async (
     scenes: Scene[],
     signal: AbortSignal,
+    hookText: string,
   ) => {
     const request = {
       scenes: scenes.map((scene, index) => ({
@@ -169,6 +170,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         asset_id: scene.asset_id!,
       })),
       voice: null,
+      hook_text: hookText,
     }
 
     // 실제 백엔드는 음성 생성과 영상 렌더링을 하나의 작업으로 처리
@@ -180,6 +182,10 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         if (missingImage !== -1) {
           throw new Error(`${missingImage + 1}번 장면에 이미지가 지정되지 않았습니다.`)
         }
+
+        console.log('영상 생성 요청 데이터:', request)
+        console.log('전달되는 훅 문구:', request.hook_text)
+
         return createVideo(request, signal)
       },
       (response) => `영상 생성 요청 접수 · ${response.job_id}`,
@@ -229,6 +235,14 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           ),
         (result) => `핵심 포인트 ${result.summary.key_points.length}개`,
       )
+      console.log('대본 생성 결과:', JSON.stringify(generated))
+
+      // 왜 훅이 안나오는지 체크
+      console.log('AI 대본 생성 전체 응답:', generated)
+      console.log('AI 훅 문구:', generated.hook_text)
+
+      dispatch({ type: 'summary', summary: generated.summary })
+      dispatch({ type: 'hookText', hookText: generated.hook_text })
 
       dispatch({ type: 'summary', summary: generated.summary })
 
@@ -254,7 +268,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         return
       }
       dispatch({ type: 'runStart', phase: 'rendering' })
-      await runRender(assignRoles(scenes), signal)
+      await runRender(assignRoles(scenes), signal, generated.hook_text)
     } catch (error) {
       handleError(signal, error)
     }
@@ -285,7 +299,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     })
 
     try {
-      await runRender(scenes, signal)
+      await runRender(scenes, signal, stateRef.current.hookText)
     } catch (error) {
       handleError(signal, error)
     }
