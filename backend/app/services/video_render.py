@@ -6,7 +6,7 @@ import time
 import os
 
 
-
+from app.services.subtitle_styles import SUBTITLE_STYLES
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
 from app.schemas.video import (
@@ -15,6 +15,11 @@ from app.schemas.video import (
 )
 
 FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
+
+# 쇼츠 이미지 레이아웃
+IMAGE_WIDTH = 1080
+IMAGE_HEIGHT = 780
+IMAGE_Y = 580
 
 
 class VideoRenderingError(Exception):
@@ -65,7 +70,6 @@ def normalize_subtitles(
 # FFmpeg drawtext 필터 생성
 def build_subtitle_filter(
     subtitles: list[SubtitleCue],
-    font_file: Path,
 ) -> str:
     """장면 기준 자막 목록을 FFmpeg drawtext 필터로 변환한다."""
 
@@ -87,20 +91,46 @@ def build_subtitle_filter(
 
     filters = []
 
+    style = SUBTITLE_STYLES["default"]  # 현재는 단일 스타일만 사용
+    style_font = Path(style["font_file"])
+
     for subtitle in subtitles:
         text = escape_filter_value(subtitle.text)
-        font = escape_filter_value(str(font_file))
+
+        if not style_font.is_file():
+            raise FileNotFoundError(
+                f"자막 폰트 파일을 찾을 수 없습니다: {style_font}"
+            )
+
+        font = escape_filter_value(str(style_font))
+
+        # 자막 스타일 설정
+        font_color = style["color"]
+        font_size = style["font_size"]
+        outline_color = style["outline_color"]
+        outline_width = style["outline_width"]
+
+        # 배경 색상 및 투명도
+        background_color = style["background_color"]
+        background_opacity = style["background_opacity"]
+        background_padding = style["background_padding"]
+
+        # FFmpeg 색상 형식: #000000@0.65
+        box_color = f"{background_color}@{background_opacity}"
 
         filters.append(
             "drawtext="
             f"fontfile='{font}':"
             f"text='{text}':"
-            "fontcolor=white:"
-            "fontsize=64:"
-            "borderw=4:"
-            "bordercolor=black:"
+            f"fontcolor={font_color}:"
+            f"fontsize={font_size}:"
+            f"borderw={outline_width}:"
+            f"bordercolor={outline_color}:"
+            "box=1:"
+            f"boxcolor={box_color}:"
+            f"boxborderw={background_padding}:"
             "x=(w-text_w)/2:"
-            "y=h*0.78:"
+            "y=1280-text_h/2:"
             f"enable='between(t,{subtitle.start_sec:.3f},"
             f"{subtitle.end_sec:.3f})'"
         )
@@ -140,21 +170,13 @@ async def render_scene(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if settings.image_fit == "cover":
-        image_filter = (
-            f"scale={settings.width}:{settings.height}:"
-            "force_original_aspect_ratio=increase,"
-            f"crop={settings.width}:{settings.height},"
-            "setsar=1"
-        )
-    else:
-        image_filter = (
-            f"scale={settings.width}:{settings.height}:"
-            "force_original_aspect_ratio=decrease,"
-            f"pad={settings.width}:{settings.height}:"
-            "(ow-iw)/2:(oh-ih)/2,"
-            "setsar=1"
-        )
+    image_filter = (
+        f"scale={IMAGE_WIDTH}:{IMAGE_HEIGHT}:"
+        "force_original_aspect_ratio=increase,"
+        f"crop={IMAGE_WIDTH}:{IMAGE_HEIGHT},"
+        f"pad={settings.width}:{settings.height}:0:{IMAGE_Y}:black,"
+        "setsar=1"
+    )
 
     
     print("[DEBUG] 자막 시간 계산 시작", flush=True)
@@ -167,14 +189,8 @@ async def render_scene(
 
     # 자막이 있는 경우에만 drawtext 필터 추가
     if local_subtitles:
-        if font_file is None or not font_file.is_file():
-            raise FileNotFoundError(
-                "자막 렌더링에 사용할 폰트 파일이 필요합니다."
-            )
-
         subtitle_filter = build_subtitle_filter(
             subtitles=local_subtitles,
-            font_file=font_file,
         )
 
         image_filter = f"{image_filter},{subtitle_filter}"
