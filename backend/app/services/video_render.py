@@ -325,7 +325,6 @@ async def render_scene(
 
     현재 버전은 자막을 합성하지 않는다.
     """
-    print("[DEBUG] render_scene 진입 성공", flush=True)
 
     settings = settings or VideoSettings()
 
@@ -374,10 +373,27 @@ async def render_scene(
     
     print("[DEBUG] 자막 시간 계산 시작", flush=True)
     # 전체 영상 기준 자막을 현재 장면 기준으로 변환
+    print(
+        f"[Subtitle DEBUG] "
+        f"scene={scene.order}, "
+        f"scene_start={scene_start_sec}, "
+        f"duration={scene.audio.duration_sec}, "
+        f"subtitles={scene.subtitles}"
+    )
     local_subtitles = normalize_subtitles(
         subtitles=scene.subtitles,
-        scene_start_sec=scene_start_sec,
+        scene_start_sec=0.0,
         scene_duration_sec=scene.audio.duration_sec,
+    )
+
+    print(
+        f"[Subtitle DEBUG] "
+        f"scene={scene.order} "
+        f"scene_start={scene_start_sec:.2f} "
+        f"duration={scene.audio.duration_sec:.2f} "
+        f"input={scene.subtitles} "
+        f"output={local_subtitles}",
+        flush=True,
     )
 
     # 자막이 있는 경우에만 drawtext 필터 추가
@@ -428,8 +444,6 @@ async def render_scene(
     ]
 
     try:
-        print("[FFmpeg] 실행 직전", flush=True)
-        print(f"[FFmpeg] 명령어: {command}", flush=True)
 
         process = await asyncio.create_subprocess_exec(
             *command,
@@ -438,19 +452,9 @@ async def render_scene(
             stderr=None,
         )
 
-        print(
-            f"[FFmpeg] 프로세스 시작 (PID: {process.pid})",
-            flush=True,
-        )
-
         await asyncio.wait_for(
             process.wait(),
             timeout=60,
-        )
-
-        print(
-            f"[FFmpeg] 프로세스 종료: {process.returncode}",
-            flush=True,
         )
 
         if process.returncode != 0:
@@ -509,10 +513,6 @@ async def render_video(
 
             start = time.perf_counter()
 
-            print(
-                f"[Render] 장면 {scene.order} 렌더링 시작",
-                flush=True,
-            )
 
             await render_scene(
                 scene=scene,
@@ -523,11 +523,6 @@ async def render_video(
                 hook_text=request.hook_text,
             )
 
-            print(
-                f"[Render] 장면 {scene.order} 완료: "
-                f"{time.perf_counter() - start:.2f}초",
-                flush=True,
-            )
 
             scene_paths.append(scene_output)
             scene_start_sec += scene.audio.duration_sec
@@ -556,8 +551,6 @@ async def render_video(
         ]
 
         try:
-            print("[FFmpeg] 프로세스 실행 요청", flush=True)
-            print(f"[FFmpeg] 명령어: {command}", flush=True)
 
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -572,10 +565,6 @@ async def render_video(
 
             await process.wait()
 
-            print(
-                f"[FFmpeg] 프로세스 종료 (code: {process.returncode})",
-                flush=True,
-            )
 
             if process.returncode != 0:
                 raise VideoRenderingError(

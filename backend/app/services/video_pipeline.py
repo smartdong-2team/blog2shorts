@@ -12,6 +12,7 @@ from app.schemas.video import (
 from app.services.audio_pipeline import generate_scene_audio
 from app.services.storage import get_asset
 from app.services.video_render import render_video
+from app.schemas.audio import SubtitleCue
 
 
 async def generate_video(
@@ -67,20 +68,32 @@ async def generate_video(
     print("[Pipeline] 렌더링 데이터 구성 시작", flush=True)
 
     render_scenes = []
+    scene_start_sec = 0.0
 
-    motion_by_order = {
-        scene.order: scene.motion
+    # 원본 요청에서 장면별 데이터 가져오기
+    scene_input_by_order = {
+        scene.order: scene
         for scene in request.scenes
     }
 
     for scene in audio_result.scenes:
+        # 해당 장면의 원본 요청 데이터
+        original = scene_input_by_order[scene.order]
+
         render_scenes.append(
             RenderScene(
                 order=scene.order,
+                narration=original.narration,
                 image_path=image_paths[UUID(scene.asset_id)],
                 audio=scene.audio,
-                subtitles=scene.subtitles,
-                motion=motion_by_order[scene.order],
+                subtitles=[
+                    SubtitleCue(
+                        text=original.narration,
+                        start_sec=scene_start_sec,
+                        end_sec=scene_start_sec + scene.audio.duration_sec,
+                    )
+                ],
+                motion=original.motion,
             )
         )
 
@@ -90,35 +103,18 @@ async def generate_video(
         hook_text=request.hook_text,
     )
 
-    print(
-        f"[Pipeline] 렌더링 데이터 구성 완료: "
-        f"{time.perf_counter() - start:.2f}초",
-        flush=True,
-    )
 
     # 4. 최종 영상 렌더링
     start = time.perf_counter()
-    print("[Pipeline] 영상 렌더링 시작", flush=True)
 
     result = await render_video(
         render_request,
         font_file=font_file,
     )
 
-    print(
-        f"[Pipeline] 영상 렌더링 완료: "
-        f"{time.perf_counter() - start:.2f}초",
-        flush=True,
-    )
 
     # 5. 전체 소요 시간
     total_elapsed = time.perf_counter() - total_start
 
-    print("-" * 40, flush=True)
-    print(
-        f"[Pipeline] 전체 소요 시간: {total_elapsed:.2f}초",
-        flush=True,
-    )
-    print("-" * 40, flush=True)
 
     return result

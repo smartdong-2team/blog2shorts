@@ -42,6 +42,25 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
       ? '영상 다시 만들기'
       : '영상 만들기'
 
+
+  const inspectRenderData = () => {
+    const payload = {
+      hookText,
+      scenes: scenes.map((scene, index) => ({
+        order: index + 1,
+        role: scene.role,
+        narration: scene.narration,
+        caption: scene.caption,
+        asset_id: scene.asset_id,
+        motion: scene.motion,
+      })),
+      audio,
+    }
+
+    console.log('최종 영상 제작 데이터:', payload)
+    console.log(JSON.stringify(payload, null, 2))
+  }
+
   return (
     <Card
       id={SCENE_EDITOR_ID}
@@ -113,6 +132,22 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
             onRemove={() => dispatch({ type: 'removeScene', index })}
             onPickImage={() => setPicking(index)}
             onLocate={() => scene.asset_id && onLocate(scene.asset_id)}
+            onSplit={(before, after) =>
+              dispatch({
+                type: 'splitScene',
+                index,
+                before,
+                after,
+              })
+            }
+
+            onMergePrevious={() =>
+              dispatch({
+                type: 'mergeScenePrevious',
+                index,
+              })
+            }
+
           />
         ))}
       </div>
@@ -132,6 +167,14 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
           </Text>
         )}
 
+
+        <Button
+          variant="ghost"
+          onClick={inspectRenderData}
+          disabled={locked}
+        >
+          최종 데이터 확인
+        </Button>
         <Button
           onClick={onRender}
           loading={isRendering}

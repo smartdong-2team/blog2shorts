@@ -43,6 +43,7 @@ class RenderScene(BaseModel):
     """렌더링할 개별 장면의 이미지, 음성, 자막 데이터."""
 
     order: int = Field(ge=1)
+    narration: str = Field(min_length=1)
     image_path: Path
     audio: AudioAsset
     subtitles: list[SubtitleCue] = Field(default_factory=list)

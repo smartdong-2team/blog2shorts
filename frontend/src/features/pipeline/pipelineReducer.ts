@@ -60,6 +60,16 @@ export type PipelineAction =
   | { type: 'audio'; patch: Partial<AudioSettings> }
   | { type: 'videoQueued'; jobId: string }
   | { type: 'videoFailed'; error: string; now: number }
+  | {
+    type: 'splitScene'
+    index: number
+    before: string
+    after: string
+  }
+  | {
+    type: 'mergeScenePrevious'
+    index: number
+  }
 
 const idleSteps = (): Record<StepId, StepState> => ({
   1: { status: 'idle', message: '본문·이미지 대기' },
@@ -199,6 +209,57 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       return { ...state, scenes: assignRoles(scenes) }
     }
 
+    case 'splitScene': {
+      if (state.scenes.length >= MAX_SCENES) return state
+
+      const original = state.scenes[action.index]
+      if (!original || !action.before.trim() || !action.after.trim()) {
+        return state
+      }
+
+      const scenes = [...state.scenes]
+
+      scenes.splice(
+        action.index,
+        1,
+        {
+          ...original,
+          narration: action.before,
+        },
+        {
+          ...original,
+          id: newSceneId(),
+          narration: action.after,
+        },
+      )
+
+      return {
+        ...state,
+        scenes: assignRoles(scenes),
+      }
+    }
+
+    case 'mergeScenePrevious': {
+      if (state.scenes.length <= MIN_SCENES) return state
+      if (action.index <= 0 || action.index >= state.scenes.length) {
+        return state
+      }
+
+      const scenes = [...state.scenes]
+      const previous = scenes[action.index - 1]
+      const current = scenes[action.index]
+
+      scenes.splice(action.index - 1, 2, {
+        ...previous,
+        narration: `${previous.narration.trimEnd()} ${current.narration.trimStart()}`,
+      })
+
+      return {
+        ...state,
+        scenes: assignRoles(scenes),
+      }
+    }
+
     case 'removeScene':
       if (state.scenes.length <= MIN_SCENES) return state
       return { ...state, scenes: assignRoles(state.scenes.filter((_, i) => i !== action.index)) }
@@ -213,4 +274,6 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     case 'audio':
       return { ...state, audio: { ...state.audio, ...action.patch } }
   }
+
+
 }
