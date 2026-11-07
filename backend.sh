@@ -19,7 +19,8 @@ fi
 
 # 3. FFmpeg drawtext 지원 여부 확인
 supports_drawtext() {
-  "$1" -hide_banner -filters 2>/dev/null | grep -q 'drawtext'
+  "$1" -hide_banner -filters 2>/dev/null |
+    grep 'drawtext' >/dev/null
 }
 
 FFMPEG_BIN=""
