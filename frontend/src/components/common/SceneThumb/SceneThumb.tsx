@@ -11,8 +11,21 @@ interface SceneThumbProps {
 /** 9:16 장면 썸네일. 누르면 이미지 변경 */
 export function SceneThumb({ src, label = '이미지 변경', onClick, disabled = false }: SceneThumbProps) {
   return (
-    <button type="button" className={styles.thumb} onClick={onClick} disabled={disabled} aria-label={label}>
-      {src ? <img src={src} alt="" className={styles.image} /> : <span className={styles.empty}>이미지 없음</span>}
+    <button
+      type="button"
+      className={styles.thumb}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+    >
+      <div className={styles.imageArea}>
+        {src ? (
+          <img src={src} alt="" className={styles.image} />
+        ) : (
+          <span className={styles.empty}>이미지 없음</span>
+        )}
+      </div>
+
       <span className={styles.band}>{label}</span>
     </button>
   )
