@@ -22,7 +22,7 @@ import { scrollToElement } from '../utils/scroll'
 
 export function HomePage() {
   const { toasts, showToast, dismissToast, clearToasts } = useToast()
-  const { state, dispatch, running, start, render, cancel, stepElapsed, stale, checkResult } = usePipeline({
+  const { state, dispatch, running, start, render, cancel, stepElapsed, stale} = usePipeline({
     onError: showToast,
     onRunStart: clearToasts,
   })
@@ -98,12 +98,6 @@ export function HomePage() {
             </Card>
           )}
         </SplitLayout>
-      )}
-
-      {state.jobId && !state.result && (
-        <Button onClick={checkResult}>
-          완성 영상 확인하기
-        </Button>
       )}
 
       <VideoPreview

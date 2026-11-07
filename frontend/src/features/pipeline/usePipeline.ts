@@ -107,7 +107,24 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           failVideo(error?.message ?? '영상 생성에 실패했습니다.')
           return
         }
-        if (status === 'completed') return
+
+        /** 기존에는 상태가 completed가 되면 그냥 종료했지만, 이제는 렌더링 결과를 확인하고 rendered 액션을 호출하도록 변경 */
+        if (status === 'completed') {
+          const { scenes, audio } = stateRef.current
+
+          dispatch({
+            type: 'rendered',
+            result: {
+              duration_sec: 0,
+              width: 1080,
+              height: 1920,
+              download_url: videoDownloadUrl(jobId),
+            },
+            renderedWith: renderKey(scenes, audio),
+          })
+
+          return
+        }
         timer = setTimeout(poll, VIDEO_POLL_MS)
       } catch (error) {
         if (!stopped) handleStatusError(error)
@@ -274,39 +291,6 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     }
   }
 
-  const checkResult = async () => {
-    const { jobId, scenes, audio } = stateRef.current
-
-    if (!jobId) return
-
-    try {
-      const { status, error } = await getVideoStatus(jobId)
-
-      if (status === 'failed') {
-        failVideo(error?.message ?? '영상 생성에 실패했습니다.')
-        return
-      }
-
-      if (status !== 'completed') {
-        alert('아직 영상을 제작하고 있어. 잠시 후 다시 확인해 줘.')
-        return
-      }
-
-      dispatch({
-        type: 'rendered',
-        result: {
-          duration_sec: 0,
-          width: 1080,
-          height: 1920,
-          download_url: videoDownloadUrl(jobId),
-        },
-        renderedWith: renderKey(scenes, audio),
-      })
-    } catch (error) {
-      handleStatusError(error)
-    }
-  }
-
   const cancel = () => abortRef.current?.abort()
 
   /** 단계 카드 아래 경과 시간 */
@@ -318,5 +302,5 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
 
   const stale = state.result != null && state.renderedWith !== renderKey(state.scenes, state.audio)
 
-  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale, checkResult }
+  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale }
 }

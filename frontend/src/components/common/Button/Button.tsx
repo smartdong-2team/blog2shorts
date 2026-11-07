@@ -17,11 +17,22 @@ export function Button({
   children,
   ...rest
 }: ButtonProps) {
-  const classNames = [styles.button, styles[variant], className].filter(Boolean).join(' ')
+  const classNames = [styles.button, styles[variant], className]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <button type={type} className={classNames} disabled={disabled || loading} aria-busy={loading} {...rest}>
-      {loading ? '처리 중…' : children}
+    <button
+      type={type}
+      className={classNames}
+      disabled={disabled || loading}
+      aria-busy={loading}
+      {...rest}
+    >
+      {loading && (
+        <span className={styles.spinner} aria-hidden="true" />
+      )}
+      {children}
     </button>
   )
 }
