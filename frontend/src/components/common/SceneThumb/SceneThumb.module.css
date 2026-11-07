@@ -135,3 +135,72 @@
   object-fit: cover;
   transition: filter 0.2s ease;
 }
+
+
+
+/* 이미지 움직임 미리보기 */
+
+.zoomIn {
+  animation: zoomInPreview 4s linear forwards;
+}
+
+.zoomOut {
+  animation: zoomOutPreview 4s linear forwards;
+}
+
+.panLeft {
+  animation: panLeftPreview 4s linear forwards;
+}
+
+.panRight {
+  animation: panRightPreview 4s linear forwards;
+}
+
+/* 확대 */
+@keyframes zoomInPreview {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.2);
+  }
+}
+
+/* 축소 */
+@keyframes zoomOutPreview {
+  from {
+    transform: scale(1.2);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* 왼쪽 이동 */
+@keyframes panLeftPreview {
+  from {
+    transform: scale(1.2) translateX(6%);
+  }
+  to {
+    transform: scale(1.2) translateX(-6%);
+  }
+}
+
+/* 오른쪽 이동 */
+@keyframes panRightPreview {
+  from {
+    transform: scale(1.2) translateX(-6%);
+  }
+  to {
+    transform: scale(1.2) translateX(6%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zoomIn,
+  .zoomOut,
+  .panLeft,
+  .panRight {
+    animation: none;
+  }
+}

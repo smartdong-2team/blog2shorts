@@ -48,6 +48,7 @@ export function SceneCard({
         subtitle={scene.narration}
         onClick={onPickImage}
         disabled={locked}
+        motion={scene.motion}
         label={`장면 ${number} 이미지 변경`}
       />
       <div className={styles.fields}>
