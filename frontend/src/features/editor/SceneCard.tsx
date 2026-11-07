@@ -13,6 +13,7 @@ interface SceneCardProps {
   index: number
   total: number
   imageUrl: string | null
+  hookText: string
   locked: boolean
   canRemove: boolean
   onChange: (patch: Partial<Pick<Scene, 'narration' | 'caption' | 'motion'>>) => void
@@ -27,6 +28,7 @@ export function SceneCard({
   index,
   total,
   imageUrl,
+  hookText,
   locked,
   canRemove,
   onChange,
@@ -40,7 +42,14 @@ export function SceneCard({
 
   return (
     <div className={styles.scene}>
-      <SceneThumb src={imageUrl} onClick={onPickImage} disabled={locked} label={`장면 ${number} 이미지 변경`} />
+      <SceneThumb
+        src={imageUrl}
+        hookText={hookText}
+        subtitle={scene.narration}
+        onClick={onPickImage}
+        disabled={locked}
+        label={`장면 ${number} 이미지 변경`}
+      />
       <div className={styles.fields}>
         <div className={styles.top}>
           <RoleBadge role={scene.role} index={number} />
@@ -77,7 +86,7 @@ export function SceneCard({
       </div>
       <div className={styles.tools}>
         <Button variant="icon" aria-label={`장면 ${number} 위로`} onClick={() => onMove(-1)} disabled={locked || index === 0}>
-          ↑
+          ←
         </Button>
         <Button
           variant="icon"
@@ -85,7 +94,7 @@ export function SceneCard({
           onClick={() => onMove(1)}
           disabled={locked || index === total - 1}
         >
-          ↓
+          →
         </Button>
         <Button variant="icon" onClick={onRemove} disabled={locked || !canRemove}>
           삭제

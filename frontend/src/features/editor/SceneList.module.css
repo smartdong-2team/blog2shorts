@@ -1,0 +1,22 @@
+.sceneList {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 20px;
+
+  width: 100%;
+  min-width: 0;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  padding: 8px 4px 20px;
+
+  scroll-snap-type: x proximity;
+}
+
+.sceneList > * {
+  flex: 0 0 360px;
+  min-width: 0;
+  scroll-snap-align: start;
+}

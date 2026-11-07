@@ -9,7 +9,7 @@ import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec } f
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
-// import { LoaderCircle } from 'lucide-react'
+import styles from './SceneList.module.css'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
 
@@ -27,7 +27,7 @@ interface SceneListProps {
 /** 3단계 결과 확인·수정 + 4단계 음성·음악 설정 + 영상 만들기 */
 export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSource, onLocate, onRender }: SceneListProps) {
   const [picking, setPicking] = useState<number | null>(null)
-  const { scenes, content, summary, audio, result } = state
+  const { scenes, content, summary, audio, result, hookText } = state
 
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
   const sec = estimateSec(scenes)
@@ -70,7 +70,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
         </Text>
       </Stack>
 
-      <div>
+      <div className={styles.sceneList}>
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
@@ -78,6 +78,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
             index={index}
             total={scenes.length}
             imageUrl={imageUrl(scene.asset_id)}
+            hookText={hookText}
             locked={locked}
             canRemove={scenes.length > MIN_SCENES}
             onChange={(patch) => dispatch({ type: 'editScene', index, patch })}
