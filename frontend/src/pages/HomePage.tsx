@@ -122,7 +122,7 @@ export function HomePage() {
           {health.status === 'error' && <StatusBadge tone="danger" label="연결 실패" />}
           <Text variant="small" tone="muted" as="span">
             {health.status === 'ok' && `환경 ${health.data.app_env} · 버전 ${health.data.version}`}
-            {health.status === 'error' && `${health.message} · 지금 화면은 목업 데이터로 동작합니다.`}
+            {health.status === 'error' && `${health.message} · 백엔드를 실행한 뒤 다시 확인해 주세요.`}
           </Text>
         </Stack>
       </Card>

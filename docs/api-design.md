@@ -55,6 +55,8 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 | 5 | POST | `/videos` | 편집된 장면으로 렌더 작업 생성 | 설계 |
 | 6 | GET | `/videos/{job_id}` | 렌더 작업 상태 조회 | 설계 |
 | 7 | GET | `/videos/{job_id}/download` | 완성 MP4 다운로드·미리보기 | 설계 |
+| 8 | DELETE | `/videos/{job_id}` | 진행 중인 렌더 작업 중지 | **구현됨** |
+| 9 | GET | `/audio/music` | 음원 파일이 있는 배경음악 목록 | **구현됨** |
 
 요청서의 예시(`POST /videos/render`, `GET /videos/{job_id}/status`) 대비 변경점: 렌더 작업을 `videos` 리소스 생성으로 보고 `POST /videos`, 상태는 리소스 조회 `GET /videos/{job_id}`로 단순화했다. 이미지가 핫링크 제한을 받을 수 있어 `GET /assets/{asset_id}`를 추가했다.
 
@@ -166,11 +168,14 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
   "scenes": [
     { "order": 1, "role": "hook", "narration": "…", "caption": "…", "asset_id": "5b8e…" }
   ],
-  "voice": null
+  "hook_text": "…",
+  "voice": "calm_female",
+  "music": "none",
+  "music_volume": 30
 }
 ```
 
-검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 선택 기능(OPT-02)용으로 MVP에서는 `null`(서버 기본값).
+검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 `calm_female` | `bright_female` | `clear_male` | `low_male` 또는 `null`(기본 목소리)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이다.
 
 - Response `202`
 
@@ -178,12 +183,12 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 { "job_id": "c1f2…", "status": "queued", "status_url": "/api/v1/videos/c1f2…" }
 ```
 
-- 오류: `422 VALIDATION_ERROR`, `404 NOT_FOUND`(없는 asset_id)
+- 오류: `422 VALIDATION_ERROR`, `404 NOT_FOUND`(없는 asset_id, 음원 파일이 없는 곡)
 
 ## 6. `GET /api/v1/videos/{job_id}`
 
 - 목적: 렌더 작업 진행 상태 조회 (프론트엔드가 2초 간격 폴링)
-- 현재 구현 응답: `{ "job_id": "c1f2…", "status": "queued" | "processing" | "completed" | "failed", "error": null | { "code", "message" } }`. `error.code`는 공통 오류 코드(OpenAI 키 만료 등)이거나 `TTS_FAILED`, `RENDER_FAILED`다. 아래는 최초 설계안이며 `step`·`progress` 등은 아직 구현되지 않았다.
+- 현재 구현 응답: `{ "job_id": "c1f2…", "status": "queued" | "processing" | "completed" | "failed" | "cancelled", "error": null | { "code", "message" } }`. `error.code`는 공통 오류 코드(OpenAI 키 만료 등)이거나 `TTS_FAILED`, `RENDER_FAILED`다. 아래는 최초 설계안이며 `step`·`progress` 등은 아직 구현되지 않았다.
 - Response `200`
 
 ```json
@@ -216,3 +221,14 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 - Request: query `inline=true`면 미리보기(`Content-Disposition: inline`), 기본은 `attachment; filename="blog2shorts-{job_id}.mp4"`
 - Response `200`: `video/mp4` 바이너리
 - 오류: `404 NOT_FOUND`, `409 JOB_NOT_READY`
+
+## 8. `DELETE /api/v1/videos/{job_id}`
+
+- 목적: 진행 중인 렌더 작업 중지. 실행 중인 FFmpeg도 함께 종료한다
+- Response `200`: `GET /videos/{job_id}`와 같은 형식. 이미 끝난 작업은 상태를 바꾸지 않는다
+- 오류: `404 NOT_FOUND`
+
+## 9. `GET /api/v1/audio/music`
+
+- 목적: `backend/assets/music/`에 음원 파일이 있는 배경음악 목록 조회
+- Response `200`: `{ "tracks": [{ "id": "soft_piano", "label": "잔잔한 피아노" }] }`

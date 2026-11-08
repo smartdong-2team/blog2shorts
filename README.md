@@ -12,7 +12,7 @@
 - **장면 확인 후 만들기**: ①~③까지 만들고 멈춤 → 장면·목소리·배경음악을 확인/수정 → ④~⑤
 - **처음부터 끝까지 자동**: ①~⑤를 한 번에. 완성 후 장면을 고쳐 다시 만들 수 있음
 
-> **현재 프론트엔드는 목업 데이터로 전체 흐름이 동작합니다.** 백엔드는 상태 확인 API만 있고, 화면의 단계 처리는 `frontend/src/features/pipeline/mockApi.ts`의 가짜 응답(지연 포함)입니다. 완성 영상은 검은 9:16 화면으로 표시됩니다. → [현재 구현 상태](#현재-구현-상태)
+> 전체 흐름은 실제 API로 동작하며, `OPENAI_API_KEY`와 FFmpeg가 필요합니다. → [현재 구현 상태](#현재-구현-상태)
 
 ## 기술 스택
 
@@ -21,8 +21,8 @@
 | Frontend | React 19, TypeScript 7, Vite 8, CSS Modules, oxlint |
 | Backend | Python 3.13, FastAPI, Pydantic v2, pydantic-settings, Uvicorn, uv |
 | 테스트 | pytest, FastAPI TestClient |
-| AI (예정) | OpenAI API — 대본 생성(Structured Outputs), TTS |
-| 영상 (예정) | FFmpeg CLI (Python `subprocess`로 호출) |
+| AI | OpenAI API — 대본 생성(Structured Outputs), TTS |
+| 영상 | FFmpeg CLI (Python `subprocess`로 호출) |
 
 선택 이유는 [docs/tech-decisions.md](docs/tech-decisions.md)에 있습니다.
 
@@ -51,7 +51,7 @@ blog2shorts/
 │       │   │                     #          SegmentedControl, Select, Range, SceneThumb, Dialog, VideoPlayer)
 │       │   └── layout/           # PageLayout, SplitLayout
 │       ├── features/
-│       │   ├── pipeline/         # 5단계 상태(useReducer)·진행 방식·목업 API
+│       │   ├── pipeline/         # 5단계 상태(useReducer)·진행 방식
 │       │   ├── content/          # ① 입력 폼(진행 방식 토글 포함), 가져온 원문
 │       │   ├── script/           # ② 대본 요약
 │       │   ├── editor/           # ③ 장면 확인·수정, 이미지 선택
@@ -84,7 +84,7 @@ blog2shorts/
 
 - Node.js 20.19+ 또는 22.12+ (Vite 8 요구사항, 개발 환경은 Node 26에서 확인)
 - [uv](https://docs.astral.sh/uv/) — Python 3.13이 없으면 `uv`가 자동으로 설치합니다
-- (영상 합성 단계부터) FFmpeg
+- FFmpeg (영상 합성, PATH에서 실행 가능해야 함)
 
 ## 설치 및 실행
 
@@ -123,7 +123,7 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
-첫 화면의 "백엔드 연결 상태"가 **연결됨**이면 정상입니다. 백엔드가 꺼져 있으면 **연결 실패**가 표시되고 "다시 확인"으로 재시도할 수 있습니다. 백엔드 없이도 목업 흐름은 그대로 동작합니다("예시 글 넣기" → 시작 버튼).
+첫 화면의 "백엔드 연결 상태"가 **연결됨**이면 정상입니다. 백엔드가 꺼져 있으면 **연결 실패**가 표시되고 "다시 확인"으로 재시도할 수 있습니다.
 
 ## 환경변수
 
@@ -133,9 +133,13 @@ npm run dev                   # http://localhost:5173
 |---|---|---|
 | `APP_ENV` | `development` | `development` \| `production` |
 | `CORS_ORIGINS` | `["http://localhost:5173","http://127.0.0.1:5173"]` | 허용할 프론트엔드 Origin (JSON 배열) |
-| `OPENAI_API_KEY` | (없음) | 이후 단계에서 사용. **백엔드에만 설정** |
-| `NAVER_BLOG_IDS` | `["copper567"]` | URL 추출을 허용할 네이버 블로그 ID (이후 단계) |
-| `STORAGE_DIR` | `backend/storage` | 생성 파일 저장 경로 (이후 단계) |
+| `OPENAI_API_KEY` | (없음) | 대본·TTS 생성에 사용. **백엔드에만 설정** |
+| `NAVER_BLOG_IDS` | `["copper567"]` | 허용할 네이버 블로그 ID (예약, 현재 미사용) |
+| `STORAGE_DIR` | `backend/storage` | 이미지·영상 저장 경로 |
+
+`OPENAI_SCRIPT_MODEL`(기본 `gpt-4.1-mini`), `OPENAI_TTS_MODEL`(기본 `tts-1`)로 모델을 바꿀 수 있습니다. 대본 모델은 이미지 입력을 지원해야 합니다.
+
+배경음악은 라이선스를 확인한 음원을 `backend/assets/music/`에 넣으면 화면에 나타납니다. 자세한 내용은 [음원 안내](backend/assets/music/README.md)를 참고하세요.
 
 실제 환경변수가 `.env` 값보다 우선합니다.
 
@@ -166,7 +170,7 @@ npm run lint       # oxlint
 | 요구사항·설계 문서 (`docs/`) | 완료 |
 | Backend: FastAPI 앱, 설정, CORS, `GET /api/v1/health`, 테스트 4개 | 완료 |
 | Frontend: 디자인 시스템(토큰·공통 컴포넌트 16종 + 레이아웃 2종), API 클라이언트 | 완료 |
-| Frontend: 5단계 화면 흐름 + 진행 방식 토글(장면 확인 후 만들기 / 처음부터 끝까지 자동), 장면 편집, 목소리·배경음악 선택, 중지 | 완료 (목업 데이터) |
+| Frontend: 5단계 화면 흐름 + 진행 방식 토글(장면 확인 후 만들기 / 처음부터 끝까지 자동), 장면 편집, 목소리·배경음악 선택, 중지 | 완료 |
 | 콘텐츠 입력·네이버 블로그 추출 (FR-01) | 완료 |
 | AI 대본 생성 (FR-02) | 완료 |
 | 장면 편집 (FR-03) | 프론트엔드 완료 (서버 저장 없음, 설계대로) |
