@@ -57,10 +57,21 @@ if [ -z "$FFMPEG_BIN" ] && command -v brew >/dev/null 2>&1; then
   fi
 fi
 
+# conda 'ffmpeg' 환경 확인 (Intel Mac 등 ffmpeg-full 설치가 어려운 경우)
+if [ -z "$FFMPEG_BIN" ] && command -v conda >/dev/null 2>&1; then
+  CONDA_BASE="$(conda info --base 2>/dev/null || true)"
+  CANDIDATE="$CONDA_BASE/envs/ffmpeg/bin/ffmpeg"
+
+  if [ -n "$CONDA_BASE" ] && [ -x "$CANDIDATE" ] && supports_drawtext "$CANDIDATE"; then
+    FFMPEG_BIN="$CANDIDATE"
+  fi
+fi
+
 # 사용 가능한 FFmpeg가 없으면 실행 중단
 if [ -z "$FFMPEG_BIN" ]; then
   echo "오류: drawtext 필터를 지원하는 FFmpeg를 찾지 못했습니다." >&2
   echo "macOS에서는 brew install ffmpeg-full 을 확인해 주세요." >&2
+  echo "또는: conda create -n ffmpeg -c conda-forge --override-channels 'ffmpeg=*=gpl*'" >&2
   exit 1
 fi
 
