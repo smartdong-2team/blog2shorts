@@ -1,4 +1,4 @@
-import { request } from './client'
+import { API_BASE_URL, request } from './client'
 import type {
   VideoCreateRequest,
   VideoCreateResponse,
@@ -23,13 +23,21 @@ export function createVideo(
 
 // 영상 파일 URL 생성
 export function videoDownloadUrl(jobId: string): string {
-  return `http://localhost:8000/api/v1/videos/${encodeURIComponent(jobId)}/download`
+  return `${API_BASE_URL}/api/v1/videos/${encodeURIComponent(jobId)}/download`
 }
 
 //제작 상태 조회
 export function getVideoStatus(jobId: string): Promise<VideoStatusResponse> {
   return request<VideoStatusResponse>(
     `/api/v1/videos/${encodeURIComponent(jobId)}`,
+  )
+}
+
+// 진행 중인 제작 중지
+export function cancelVideo(jobId: string): Promise<VideoStatusResponse> {
+  return request<VideoStatusResponse>(
+    `/api/v1/videos/${encodeURIComponent(jobId)}`,
+    { method: 'DELETE' },
   )
 }
 

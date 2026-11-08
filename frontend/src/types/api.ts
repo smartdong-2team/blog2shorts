@@ -102,6 +102,6 @@ export interface VideoCreateResponse {
 
 export interface VideoStatusResponse {
   job_id: string
-  status: 'queued' | 'processing' | 'completed' | 'failed'
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
   error: { code: string; message: string } | null
 }

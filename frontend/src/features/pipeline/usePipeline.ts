@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { ApiError } from '../../api/client'
-import { getVideoStatus, videoDownloadUrl } from '../../api/videos'
+import { cancelVideo, getVideoStatus, videoDownloadUrl } from '../../api/videos'
 
 // 스크립트 생성을 위한 백엔드 API 연결
 import { generateScript } from '../../api/scripts'
@@ -108,6 +108,11 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           return
         }
 
+        if (status === 'cancelled') {
+          dispatch({ type: 'stopped', message: '중지됨', now: Date.now() })
+          return
+        }
+
         /** 기존에는 상태가 completed가 되면 그냥 종료했지만, 이제는 렌더링 결과를 확인하고 rendered 액션을 호출하도록 변경 */
         if (status === 'completed') {
           const { scenes, audio } = stateRef.current
@@ -121,6 +126,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
               download_url: videoDownloadUrl(jobId),
             },
             renderedWith: renderKey(scenes, audio),
+            now: Date.now(),
           })
 
           return
@@ -193,10 +199,11 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       (response) => `영상 생성 요청 접수 · ${response.job_id}`,
     )
 
-    // 202는 작업 접수이므로 아직 rendered 액션을 호출하지 않음
+    // 202는 작업 접수이므로 완성될 때까지 5단계를 진행 중으로 둔다
     dispatch({
       type: 'videoQueued',
       jobId: result.job_id,
+      now: Date.now(),
     })
   }
   /** 1단계부터 시작. 검토 모드는 3단계 후 멈추고, 자동 모드는 5단계까지 */
@@ -288,7 +295,16 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     }
   }
 
-  const cancel = () => abortRef.current?.abort()
+  /** 진행 중인 요청을 끊고, 서버에 넘어간 영상 작업도 함께 중지한다 */
+  const cancel = () => {
+    abortRef.current?.abort()
+
+    const { jobId: runningJob, result } = stateRef.current
+    if (!runningJob || result) return
+
+    dispatch({ type: 'stopped', message: '중지됨', now: Date.now() })
+    cancelVideo(runningJob).catch((error) => onError(errorMessage(error)))
+  }
 
   /** 단계 카드 아래 경과 시간 */
   const stepElapsed = (id: StepId) => {

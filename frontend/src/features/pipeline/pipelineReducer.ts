@@ -51,14 +51,14 @@ export type PipelineAction =
   | { type: 'summary'; summary: ScriptSummary }
   | { type: 'hookText'; hookText: string }
   | { type: 'scenes'; scenes: Scene[] }
-  | { type: 'rendered'; result: RenderResult; renderedWith: string }
+  | { type: 'rendered'; result: RenderResult; renderedWith: string; now: number }
   | { type: 'editScene'; index: number; patch: Partial<Omit<Scene, 'id' | 'role'>> }
   | { type: 'moveScene'; index: number; delta: -1 | 1 }
   | { type: 'addScene' }
   | { type: 'removeScene'; index: number }
   | { type: 'addImage'; image: ContentImage; sceneIndex: number }
   | { type: 'audio'; patch: Partial<AudioSettings> }
-  | { type: 'videoQueued'; jobId: string }
+  | { type: 'videoQueued'; jobId: string; now: number }
   | { type: 'videoFailed'; error: string; now: number }
   | {
     type: 'splitScene'
@@ -132,7 +132,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       const next = running
         ? setStep(state, running, { status: 'cancelled', message: action.message, endedAt: action.now })
         : state
-      return { ...next, phase: next.scenes.length ? 'review' : 'stopped' }
+      return { ...next, phase: next.scenes.length ? 'review' : 'stopped', jobId: null }
     }
 
     case 'waitReview': {
@@ -153,7 +153,12 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       return { ...state, scenes: assignRoles(action.scenes) }
 
     case 'rendered':
-      return { ...state, phase: 'done', result: action.result, renderedWith: action.renderedWith }
+      return {
+        ...setStep(state, 5, { status: 'done', message: '영상 완성', endedAt: action.now }),
+        phase: 'done',
+        result: action.result,
+        renderedWith: action.renderedWith,
+      }
 
     case 'editScene':
       return {
@@ -164,7 +169,8 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
     case 'videoQueued':
       return {
-        ...state,
+        // 완성될 때까지 5단계를 진행 중으로 두어 중지 버튼을 보여준다
+        ...setStep(state, 5, { status: 'running', message: '음성·자막·영상 합성 중', endedAt: undefined }),
         jobId: action.jobId,
         phase: 'rendering',
       }
