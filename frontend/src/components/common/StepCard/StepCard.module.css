@@ -1,14 +1,20 @@
 .card {
+  position: relative;
+  overflow: hidden;
   padding: var(--space-14) var(--space-14) var(--space-12);
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-xl);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .step {
   display: flex;
   align-items: center;
   gap: var(--space-6);
+  min-height: 20px;
   font-size: var(--font-size-micro);
   font-weight: 600;
   color: var(--color-text-muted);
@@ -34,27 +40,91 @@
   font-variant-numeric: tabular-nums;
 }
 
-.spinner {
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--color-accent);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin var(--duration-spin) linear infinite;
-}
-
 .check {
   font-weight: 700;
   color: var(--color-accent);
 }
 
+/* 오른쪽 위 상태 배지 (진행 중·확인 대기·실패·중지됨) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-soft);
+  background: var(--color-subtle);
+}
+
+.spinner {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: step-spin var(--duration-spin) linear infinite;
+}
+
+/* 카드 아래쪽에서 왕복하는 진행 막대 */
+.progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--color-accent-bg);
+}
+
+.progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 3px;
+  background: var(--color-accent);
+  animation: step-progress 1.4s ease-in-out infinite;
+}
+
+/* 대기: 아직 차례가 아닌 단계는 흐리게 */
+.idle .title {
+  color: var(--color-text-muted);
+}
+
+/* 진행 중: 초록 테두리 + 바깥 빛 + 배지 */
 .running {
   border-color: var(--color-accent);
+  box-shadow:
+    inset 0 0 0 1px var(--color-accent),
+    0 0 0 4px var(--color-accent-bg);
+}
+
+.running .step {
+  color: var(--color-accent);
+}
+
+.running .badge {
+  color: var(--color-surface);
+  background: var(--color-accent);
+}
+
+.running .message {
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .waiting {
   border-color: var(--color-text);
   box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.waiting .badge {
+  color: var(--color-surface);
+  background: var(--color-text);
 }
 
 .waiting .message {
@@ -72,10 +142,48 @@
   border-color: var(--color-danger-line);
 }
 
+.error .badge {
+  color: var(--color-surface);
+  background: var(--color-danger);
+}
+
 .error .message {
   color: var(--color-danger);
 }
 
 .cancelled {
   background: var(--color-subtle);
+}
+
+.cancelled .badge {
+  background: var(--color-surface);
+}
+
+/* CSS Modules는 keyframes 이름도 파일 안으로 가두므로 여기서 직접 정의한다 */
+@keyframes step-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes step-progress {
+  0% {
+    left: -40%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .progress::after {
+    animation: none;
+  }
+
+  .progress::after {
+    left: 0;
+    width: 100%;
+  }
 }
