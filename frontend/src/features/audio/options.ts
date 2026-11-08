@@ -9,12 +9,15 @@ export const VOICE_OPTIONS = [
 
 export const MUSIC_OPTIONS = [
   { value: 'none', label: '배경음악 없음' },
+  { value: 'salsa_new_york', label: '살사 (Salsa Estilo New York 03)' },
   { value: 'soft_piano', label: '잔잔한 피아노' },
   { value: 'light_acoustic', label: '경쾌한 어쿠스틱' },
   { value: 'dreamy_synth', label: '몽환적인 신스' },
 ]
 
-export const DEFAULT_AUDIO: AudioSettings = { voice: 'calm_female', music: 'soft_piano', music_volume: 30 }
+export const NO_MUSIC = 'none'
+
+export const DEFAULT_AUDIO: AudioSettings = { voice: 'calm_female', music: NO_MUSIC, music_volume: 30 }
 
 const labelOf = (options: { value: string; label: string }[], value: string) =>
   options.find((o) => o.value === value)?.label ?? value

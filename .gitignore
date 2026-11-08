@@ -23,3 +23,6 @@ __pycache__/
 .pytest_cache/
 backend/storage/
 backend/output/
+# 음원 원본은 라이선스상 저장소에 올리지 않는다 (backend/assets/music/README.md 참고)
+backend/assets/music/*
+!backend/assets/music/README.md

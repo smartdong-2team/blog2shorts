@@ -5,7 +5,7 @@ import { Stack } from '../../components/common/Stack'
 import { Text } from '../../components/common/Text'
 import { VoiceMusicPicker } from '../audio/VoiceMusicPicker'
 import type { PipelineAction, PipelineState } from '../pipeline/pipelineReducer'
-import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec } from '../pipeline/scenes'
+import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec, subtitleIssue, subtitlesOf } from '../pipeline/scenes'
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
@@ -33,7 +33,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
   const sec = estimateSec(scenes)
   const inRange = sec >= TARGET_MIN_SEC && sec <= TARGET_MAX_SEC
-  const emptyScene = scenes.findIndex((s) => !s.narration.trim())
+  const emptyScene = scenes.findIndex((s) => subtitlesOf(s).some((text) => subtitleIssue(text)))
   const isRendering = state.phase === 'rendering'
 
   const renderLabel = isRendering
@@ -129,17 +129,18 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
             hookText={hookText}
             locked={locked}
             canRemove={scenes.length > MIN_SCENES}
+            canSplit={scenes.length < MAX_SCENES}
             onChange={(patch) => dispatch({ type: 'editScene', index, patch })}
+            onSubtitlesChange={(subtitles) => dispatch({ type: 'editSubtitles', index, subtitles })}
             onMove={(delta) => dispatch({ type: 'moveScene', index, delta })}
             onRemove={() => dispatch({ type: 'removeScene', index })}
             onPickImage={() => setPicking(index)}
             onLocate={() => scene.asset_id && onLocate(scene.asset_id)}
-            onSplit={(before, after) =>
+            onSplit={(subtitleIndex) =>
               dispatch({
                 type: 'splitScene',
                 index,
-                before,
-                after,
+                subtitleIndex,
               })
             }
 
@@ -165,7 +166,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
       <Stack direction="row" justify="end" align="center" gap={12} wrap>
         {emptyScene >= 0 && (
           <Text variant="caption" tone="danger" as="span">
-            {emptyScene + 1}번 장면 나레이션이 비어 있습니다
+            {emptyScene + 1}번 장면의 자막을 확인해 주세요
           </Text>
         )}
 

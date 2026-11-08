@@ -40,6 +40,7 @@ export interface ScriptScene {
   role: ScriptSceneRole
   narration: string
   caption: string
+  subtitle_pages: string[][]
   asset_id: string | null
 }
 
@@ -74,7 +75,11 @@ export interface ContentExtractResponse {
 }
 
 
-// api - videos.ts 관련 타입 정리 
+export interface MusicListResponse {
+  tracks: { id: string; label: string }[]
+}
+
+// api - videos.ts 관련 타입 정리
 export interface VideoCreateRequest {
   scenes: {
     order: number
@@ -83,8 +88,11 @@ export interface VideoCreateRequest {
     caption: string
     asset_id: string
     motion: Motion
+    subtitle_pages: string[][]
   }[]
   voice: string | null
+  music: string
+  music_volume: number
   hook_text?: string
 }
 
@@ -96,6 +104,6 @@ export interface VideoCreateResponse {
 
 export interface VideoStatusResponse {
   job_id: string
-  status: 'queued' | 'processing' | 'completed' | 'failed'
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
   error: { code: string; message: string } | null
 }

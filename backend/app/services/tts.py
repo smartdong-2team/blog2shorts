@@ -3,8 +3,19 @@ import asyncio
 import wave
 from pathlib import Path
 from uuid import uuid4
+from app.core.config import get_settings
 from app.core.openai import get_openai_client
 from app.schemas.audio import AudioAsset
+
+# 화면의 목소리 선택값 → OpenAI TTS 음성
+OPENAI_VOICES = {
+    "calm_female": "shimmer",
+    "bright_female": "nova",
+    "clear_male": "echo",
+    "low_male": "onyx",
+}
+
+DEFAULT_VOICE = "calm_female"
 
 
 class TTSGenerationError(Exception):
@@ -30,7 +41,7 @@ async def generate_speech(
 
     try:
         async with client.audio.speech.with_streaming_response.create(
-            model="tts-1",
+            model=get_settings().openai_tts_model,
             voice=voice,
             input=narration,
             response_format="wav",

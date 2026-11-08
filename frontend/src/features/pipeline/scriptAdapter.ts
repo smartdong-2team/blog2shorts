@@ -13,6 +13,7 @@ export function toPipelineScenes(
       role: scene.role,
       narration: scene.narration,
       caption: scene.caption,
+      subtitles: scene.subtitle_pages.map((lines) => lines.join('\n')),
       asset_id: scene.asset_id,
       motion: 'zoom_in',
     }))

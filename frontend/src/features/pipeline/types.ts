@@ -48,6 +48,8 @@ export interface Scene {
   caption: string
   asset_id: string | null
   motion: Motion
+  /** 화면에 차례로 나오는 자막. 한 자막은 줄바꿈으로 두 줄까지. 이어 붙이면 나레이션이 된다 */
+  subtitles?: string[]
 }
 
 export interface AudioSettings {

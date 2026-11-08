@@ -2,7 +2,7 @@ from pathlib import Path
 
 FONT_DIR = Path(__file__).resolve().parents[2] / "assets" / "fonts"
 
-FONT_SIZE = 70
+FONT_SIZE = 60
 
 SUBTITLE_STYLES = {
     "default": {

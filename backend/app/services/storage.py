@@ -10,13 +10,11 @@ import socket
 import requests
 from PIL import Image, UnidentifiedImageError
 
+from app.core.config import get_settings
 
-# backend/storage/images/
-STORAGE_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "storage"
-    / "images"
-)
+
+# 기본값은 backend/storage/images/ (STORAGE_DIR 환경변수로 변경)
+STORAGE_DIR = get_settings().storage_dir / "images"
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 

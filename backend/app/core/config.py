@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # 아래 값은 이후 단계(콘텐츠 추출·AI·영상)에서 사용한다.
     openai_api_key: SecretStr | None = None
+    openai_script_model: str = "gpt-4.1-mini"
+    openai_tts_model: str = "tts-1"
     naver_blog_ids: list[str] = ["copper567"]
     storage_dir: Path = BACKEND_DIR / "storage"
 

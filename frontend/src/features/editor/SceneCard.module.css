@@ -28,6 +28,33 @@
   gap: var(--space-8);
 }
 
+.subtitles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.subtitle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.subtitleHead,
+.subtitleFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.subtitleTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
 .tools {
   display: flex;
   flex-direction: row;

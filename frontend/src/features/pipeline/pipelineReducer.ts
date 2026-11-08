@@ -1,5 +1,5 @@
 import { DEFAULT_AUDIO } from '../audio/options'
-import { MAX_SCENES, MIN_SCENES, assignRoles, newSceneId } from './scenes'
+import { MAX_SCENES, MIN_SCENES, assignRoles, narrationFromSubtitles, newSceneId, subtitlesOf } from './scenes'
 import type {
   AudioSettings,
   Content,
@@ -51,20 +51,21 @@ export type PipelineAction =
   | { type: 'summary'; summary: ScriptSummary }
   | { type: 'hookText'; hookText: string }
   | { type: 'scenes'; scenes: Scene[] }
-  | { type: 'rendered'; result: RenderResult; renderedWith: string }
+  | { type: 'rendered'; result: RenderResult; renderedWith: string; now: number }
   | { type: 'editScene'; index: number; patch: Partial<Omit<Scene, 'id' | 'role'>> }
   | { type: 'moveScene'; index: number; delta: -1 | 1 }
   | { type: 'addScene' }
   | { type: 'removeScene'; index: number }
   | { type: 'addImage'; image: ContentImage; sceneIndex: number }
   | { type: 'audio'; patch: Partial<AudioSettings> }
-  | { type: 'videoQueued'; jobId: string }
+  | { type: 'videoQueued'; jobId: string; now: number }
   | { type: 'videoFailed'; error: string; now: number }
+  | { type: 'editSubtitles'; index: number; subtitles: string[] }
   | {
     type: 'splitScene'
     index: number
-    before: string
-    after: string
+    /** 이 자막부터 새 장면으로 나눈다 */
+    subtitleIndex: number
   }
   | {
     type: 'mergeScenePrevious'
@@ -132,7 +133,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       const next = running
         ? setStep(state, running, { status: 'cancelled', message: action.message, endedAt: action.now })
         : state
-      return { ...next, phase: next.scenes.length ? 'review' : 'stopped' }
+      return { ...next, phase: next.scenes.length ? 'review' : 'stopped', jobId: null }
     }
 
     case 'waitReview': {
@@ -153,7 +154,12 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       return { ...state, scenes: assignRoles(action.scenes) }
 
     case 'rendered':
-      return { ...state, phase: 'done', result: action.result, renderedWith: action.renderedWith }
+      return {
+        ...setStep(state, 5, { status: 'done', message: '영상 완성', endedAt: action.now }),
+        phase: 'done',
+        result: action.result,
+        renderedWith: action.renderedWith,
+      }
 
     case 'editScene':
       return {
@@ -161,10 +167,21 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         scenes: state.scenes.map((s, i) => (i === action.index ? { ...s, ...action.patch } : s)),
       }
 
+    case 'editSubtitles':
+      return {
+        ...state,
+        scenes: state.scenes.map((s, i) =>
+          i === action.index
+            ? { ...s, subtitles: action.subtitles, narration: narrationFromSubtitles(action.subtitles) }
+            : s,
+        ),
+      }
+
     // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
     case 'videoQueued':
       return {
-        ...state,
+        // 완성될 때까지 5단계를 진행 중으로 두어 중지 버튼을 보여준다
+        ...setStep(state, 5, { status: 'running', message: '음성·자막·영상 합성 중', endedAt: undefined }),
         jobId: action.jobId,
         phase: 'rendering',
       }
@@ -202,6 +219,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         id: newSceneId(),
         role: 'body',
         narration: '',
+        subtitles: [''],
         caption: '',
         asset_id: state.scenes[last]?.asset_id ?? null,
         motion: 'zoom_in',
@@ -213,9 +231,11 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       if (state.scenes.length >= MAX_SCENES) return state
 
       const original = state.scenes[action.index]
-      if (!original || !action.before.trim() || !action.after.trim()) {
-        return state
-      }
+      if (!original) return state
+
+      const before = subtitlesOf(original).slice(0, action.subtitleIndex)
+      const after = subtitlesOf(original).slice(action.subtitleIndex)
+      if (!before.length || !after.length) return state
 
       const scenes = [...state.scenes]
 
@@ -224,12 +244,14 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         1,
         {
           ...original,
-          narration: action.before,
+          subtitles: before,
+          narration: narrationFromSubtitles(before),
         },
         {
           ...original,
           id: newSceneId(),
-          narration: action.after,
+          subtitles: after,
+          narration: narrationFromSubtitles(after),
         },
       )
 
@@ -248,10 +270,12 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       const scenes = [...state.scenes]
       const previous = scenes[action.index - 1]
       const current = scenes[action.index]
+      const subtitles = [...subtitlesOf(previous), ...subtitlesOf(current)]
 
       scenes.splice(action.index - 1, 2, {
         ...previous,
-        narration: `${previous.narration.trimEnd()} ${current.narration.trimStart()}`,
+        subtitles,
+        narration: narrationFromSubtitles(subtitles),
       })
 
       return {

@@ -24,6 +24,7 @@ from app.schemas.video import (
 def make_render_scene(order: int = 1) -> RenderScene:
     return RenderScene(
         order=order,
+        narration="테스트 내레이션",
         image_path=Path(f"images/scene-{order}.jpg"),
         audio=AudioAsset(
             path=f"audio/scene-{order}.wav",
@@ -239,7 +240,29 @@ def test_video_create_request_voice_defaults_to_none():
     assert request.voice is None
 
 
-def test_video_create_request_reject_voice_selection():
+def test_video_create_request_accepts_voice_and_music():
+    request = VideoCreateRequest(
+        scenes=[make_video_scene_input()],
+        voice="low_male",
+        music="soft_piano",
+        music_volume=50,
+    )
+
+    assert request.voice == "low_male"
+    assert request.music == "soft_piano"
+    assert request.music_volume == 50
+
+
+@pytest.mark.parametrize("volume", [-1, 101])
+def test_video_create_request_rejects_invalid_music_volume(volume):
+    with pytest.raises(ValidationError):
+        VideoCreateRequest(
+            scenes=[make_video_scene_input()],
+            music_volume=volume,
+        )
+
+
+def test_video_create_request_rejects_unknown_voice():
     with pytest.raises(ValidationError):
         VideoCreateRequest(
             scenes=[make_video_scene_input()],

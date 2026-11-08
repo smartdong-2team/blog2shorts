@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { ApiError } from '../../api/client'
-import { getVideoStatus, videoDownloadUrl } from '../../api/videos'
+import { cancelVideo, getVideoStatus, videoDownloadUrl } from '../../api/videos'
 
 // 스크립트 생성을 위한 백엔드 API 연결
 import { generateScript } from '../../api/scripts'
@@ -12,7 +12,7 @@ import { extractContent, } from './mockApi'
 import { toPipelineScenes } from './scriptAdapter'
 
 import { initialPipeline, pipelineReducer, renderKey } from './pipelineReducer'
-import { assignRoles, estimateSec, formatSec } from './scenes'
+import { assignRoles, estimateSec, formatSec, subtitlePagesOf } from './scenes'
 import type { ContentInput, Scene, StepId } from './types'
 
 const imageCount = (text: string) => (text.match(/\[이미지 \d+\]/g) ?? []).length
@@ -108,6 +108,11 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           return
         }
 
+        if (status === 'cancelled') {
+          dispatch({ type: 'stopped', message: '중지됨', now: Date.now() })
+          return
+        }
+
         /** 기존에는 상태가 completed가 되면 그냥 종료했지만, 이제는 렌더링 결과를 확인하고 rendered 액션을 호출하도록 변경 */
         if (status === 'completed') {
           const { scenes, audio } = stateRef.current
@@ -115,12 +120,13 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           dispatch({
             type: 'rendered',
             result: {
-              duration_sec: 0,
+              duration_sec: estimateSec(scenes),
               width: 1080,
               height: 1920,
               download_url: videoDownloadUrl(jobId),
             },
             renderedWith: renderKey(scenes, audio),
+            now: Date.now(),
           })
 
           return
@@ -161,6 +167,8 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     signal: AbortSignal,
     hookText: string,
   ) => {
+    const { audio } = stateRef.current
+
     const request = {
       scenes: scenes.map((scene, index) => ({
         order: index + 1,
@@ -169,8 +177,11 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         caption: scene.caption,
         asset_id: scene.asset_id!,
         motion: scene.motion,
+        subtitle_pages: subtitlePagesOf(scene),
       })),
-      voice: null,
+      voice: audio.voice,
+      music: audio.music,
+      music_volume: audio.music_volume,
       hook_text: hookText,
     }
 
@@ -184,22 +195,17 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           throw new Error(`${missingImage + 1}번 장면에 이미지가 지정되지 않았습니다.`)
         }
 
-        console.log('영상 생성 요청 데이터:', request)
-        console.log('전달되는 훅 문구:', request.hook_text)
-
         return createVideo(request, signal)
       },
       (response) => `영상 생성 요청 접수 · ${response.job_id}`,
     )
 
-    console.log('영상 생성 작업:', result)
-    // 생성된 영상의 작업 ID 저장
+    // 202는 작업 접수이므로 완성될 때까지 5단계를 진행 중으로 둔다
     dispatch({
       type: 'videoQueued',
       jobId: result.job_id,
+      now: Date.now(),
     })
-
-    // 202는 작업 접수이므로 아직 rendered 액션을 호출하지 않음
   }
   /** 1단계부터 시작. 검토 모드는 3단계 후 멈추고, 자동 모드는 5단계까지 */
   const start = async (input: ContentInput) => {
@@ -214,8 +220,6 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         (c) => `본문 ${bodyChars(c.text).toLocaleString()}자 · 이미지 ${imageCount(c.text) || c.images.length}장`,
       )
       dispatch({ type: 'content', content })
-      console.log('백엔드에 전달할 콘텐츠:', content)
-
 
       // 2~3단계: 대본 생성 + 장면 구성
       const generated = await step(
@@ -236,16 +240,9 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           ),
         (result) => `핵심 포인트 ${result.summary.key_points.length}개`,
       )
-      console.log('대본 생성 결과:', JSON.stringify(generated))
-
-      // 왜 훅이 안나오는지 체크
-      console.log('AI 대본 생성 전체 응답:', generated)
-      console.log('AI 훅 문구:', generated.hook_text)
 
       dispatch({ type: 'summary', summary: generated.summary })
       dispatch({ type: 'hookText', hookText: generated.hook_text })
-
-      dispatch({ type: 'summary', summary: generated.summary })
 
       const scenes = await step(
         3,
@@ -256,13 +253,6 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       )
 
       dispatch({ type: 'scenes', scenes })
-      console.log('이미지 개수:', content.images.length)
-      console.log('첫 번째 이미지:', content.images[0])
-      console.log(
-        '본문 이미지 위치:',
-        content.text.match(/\[이미지 \d+\]/g),
-      )
-
 
       if (mode === 'review') {
         dispatch({ type: 'waitReview' })
@@ -306,7 +296,16 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     }
   }
 
-  const cancel = () => abortRef.current?.abort()
+  /** 진행 중인 요청을 끊고, 서버에 넘어간 영상 작업도 함께 중지한다 */
+  const cancel = () => {
+    abortRef.current?.abort()
+
+    const { jobId: runningJob, result } = stateRef.current
+    if (!runningJob || result) return
+
+    dispatch({ type: 'stopped', message: '중지됨', now: Date.now() })
+    cancelVideo(runningJob).catch((error) => onError(errorMessage(error)))
+  }
 
   /** 단계 카드 아래 경과 시간 */
   const stepElapsed = (id: StepId) => {

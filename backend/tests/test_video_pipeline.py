@@ -106,7 +106,14 @@ async def test_generate_video(monkeypatch, tmp_path):
 
     assert len(render_request.scenes) == 1
     assert render_request.scenes[0].image_path == image_path
-    assert render_request.scenes[0].subtitles[0].text == "테스트 자막"
+    # 화면 자막은 음성과 같은 내레이션을 장면 기준 시간으로 표시한다
+    cues = render_request.scenes[0].subtitles
+    assert cues[0].text == "테스트 내레이션"
+    assert cues[0].start_sec == pytest.approx(0.0)
+    assert cues[-1].end_sec == pytest.approx(3.0)
+
+    # 목소리를 지정하지 않으면 기본 목소리를 사용한다
+    assert mock_audio.await_args.kwargs["voice"] == "shimmer"
 
     # TTS 파이프라인이 호출되었는지 확인
     mock_audio.assert_awaited_once()
@@ -179,3 +186,59 @@ async def test_generate_video_with_missing_asset(
 
     # 결과 파일이 생성되지 않았는지
     assert not output_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_generate_video_uses_ai_subtitle_pages(monkeypatch, tmp_path):
+    asset_id = uuid4()
+    pages = [["테스트", "내레이션"]]
+
+    request = VideoCreateRequest(
+        scenes=[
+            {
+                "order": 1,
+                "role": "hook",
+                "narration": "테스트 내레이션",
+                "caption": "자막",
+                "asset_id": asset_id,
+                "subtitle_pages": pages,
+            }
+        ]
+    )
+
+    monkeypatch.setattr(
+        video_pipeline,
+        "get_asset",
+        Mock(return_value=Mock(path=tmp_path / "image.jpg")),
+    )
+    monkeypatch.setattr(
+        video_pipeline,
+        "generate_scene_audio",
+        AsyncMock(
+            return_value=AudioGenerationResult(
+                scenes=[
+                    SceneMedia(
+                        order=1,
+                        asset_id=str(asset_id),
+                        audio=AudioAsset(path="audio.wav", duration_sec=3.0),
+                        subtitles=[
+                            SubtitleCue(text="자막", start_sec=0.0, end_sec=3.0)
+                        ],
+                    )
+                ],
+                total_duration_sec=3.0,
+            )
+        ),
+    )
+    mock_render = AsyncMock()
+    monkeypatch.setattr(video_pipeline, "render_video", mock_render)
+
+    await video_pipeline.generate_video(
+        request=request,
+        output_path=tmp_path / "output.mp4",
+        work_dir=tmp_path / "work",
+    )
+
+    cue = mock_render.await_args.args[0].scenes[0].subtitles[0]
+    assert cue.text == "테스트\n내레이션"
+
