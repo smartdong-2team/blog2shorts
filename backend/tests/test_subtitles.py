@@ -179,8 +179,7 @@ def test_split_into_pages_fits_screen_width_and_two_lines():
 
     assert len(pages) > 1
 
-    for page in pages:
-        lines = page.split("\n")
+    for lines in pages:
         assert len(lines) <= 2
         assert all(
             text_width(line) <= SUBTITLE_MAX_WIDTH
@@ -191,30 +190,67 @@ def test_split_into_pages_fits_screen_width_and_two_lines():
 def test_split_into_pages_keeps_every_word_in_order():
     pages = split_into_pages(LONG_NARRATION)
 
-    assert " ".join(pages).replace("\n", " ") == LONG_NARRATION
+    assert " ".join(" ".join(lines) for lines in pages) == LONG_NARRATION
 
 
 def test_split_into_pages_breaks_at_sentence_boundary():
     pages = split_into_pages("짧은 첫 문장이에요. 짧은 둘째 문장이에요.")
 
-    assert pages == ["짧은 첫 문장이에요.", "짧은 둘째 문장이에요."]
+    assert pages == [["짧은 첫 문장이에요."], ["짧은 둘째 문장이에요."]]
+
+
+def test_split_into_pages_follows_meaning_units():
+    """목적어까지 묶고, 술어는 이어지는 말과 함께 다음 페이지로 넘긴다."""
+
+    pages = split_into_pages(
+        "먼저 자동차 기본 구조와 각 장치의 작동 원리를 이해하는 게 기본이에요."
+    )
+
+    assert pages == [
+        ["먼저 자동차 기본 구조와", "각 장치의 작동 원리를"],
+        ["이해하는 게 기본이에요."],
+    ]
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("이해하는", "게"),
+        ("각", "장치의"),
+        ("어떤", "방법으로"),
+        ("장치의", "작동"),
+    ],
+)
+def test_split_into_pages_keeps_dependent_words_together(before, after):
+    narration = (
+        f"오늘은 공부할 때 꼭 필요한 내용을 정리해 볼게요 {before} {after} "
+        "부분을 먼저 살펴보고 천천히 따라오세요."
+    )
+
+    joined_lines = [
+        line
+        for lines in split_into_pages(narration)
+        for line in lines
+    ]
+
+    assert any(f"{before} {after}" in line for line in joined_lines)
 
 
 def test_split_into_pages_avoids_single_word_page():
     pages = split_into_pages(LONG_NARRATION.split(".")[0] + " 끝")
 
-    assert all(len(page.split()) > 1 for page in pages)
+    assert all(len(" ".join(lines).split()) > 1 for lines in pages)
 
 
 def test_split_into_pages_hard_breaks_very_long_word():
     pages = split_into_pages("가" * 60)
 
-    assert "".join(pages).replace("\n", "") == "가" * 60
+    assert "".join("".join(lines) for lines in pages) == "가" * 60
 
-    for page in pages:
+    for lines in pages:
         assert all(
             text_width(line) <= SUBTITLE_MAX_WIDTH
-            for line in page.split("\n")
+            for line in lines
         )
 
 
