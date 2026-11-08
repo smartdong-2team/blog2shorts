@@ -1,4 +1,5 @@
 # blog2shorts
+
 네이버 블로그 글을 AI 숏폼 영상으로 자동 변환
 
 블로그 URL 또는 본문을 입력하면 AI가 핵심 내용을 분석해 숏폼 대본과 장면을 만들고, 사용자가 장면을 수정한 뒤 9:16 세로형 MP4 영상으로 받아보는 웹서비스 MVP입니다. (미니인턴 과제)
@@ -16,26 +17,26 @@
 
 ## 기술 스택
 
-| 영역 | 사용 기술 |
-|---|---|
-| Frontend | React 19, TypeScript 7, Vite 8, CSS Modules, oxlint |
-| Backend | Python 3.13, FastAPI, Pydantic v2, pydantic-settings, Uvicorn, uv |
-| 테스트 | pytest, FastAPI TestClient |
-| AI | OpenAI API — 대본 생성(Structured Outputs), TTS |
-| 영상 | FFmpeg CLI (Python `subprocess`로 호출) |
+| 영역        | 사용 기술                                                         |
+| ----------- | ----------------------------------------------------------------- |
+| Frontend    | React 19, TypeScript 7, Vite 8, CSS Modules, oxlint               |
+| Backend     | Python 3.13, FastAPI, Pydantic v2, pydantic-settings, Uvicorn, uv |
+| 테스트      | pytest, FastAPI TestClient                                        |
+| AI          | OpenAI API — 대본 생성(Structured Outputs), TTS                  |
+| 영상        | FFmpeg CLI (Python `subprocess`로 호출)                         |
 
 선택 이유는 [docs/tech-decisions.md](docs/tech-decisions.md)에 있습니다.
 
 ## 문서
 
-| 문서 | 내용 |
-|---|---|
-| [requirements.md](docs/requirements.md) | 요구사항, MVP 범위, 완료 조건 |
-| [architecture.md](docs/architecture.md) | 시스템 구조, 추출·영상 생성 흐름, 저장·보안 |
-| [api-design.md](docs/api-design.md) | REST API 설계 |
-| [development-plan.md](docs/development-plan.md) | 단계별 개발 계획 |
-| [tech-decisions.md](docs/tech-decisions.md) | 기술 의사결정 기록 |
-| [design-system.md](docs/design-system.md) | 디자인 토큰·공통 컴포넌트·화면 작성 규칙 |
+| 문서                                           | 내용                                          |
+| ---------------------------------------------- | --------------------------------------------- |
+| [requirements.md](docs/requirements.md)         | 요구사항, MVP 범위, 완료 조건                 |
+| [architecture.md](docs/architecture.md)         | 시스템 구조, 추출·영상 생성 흐름, 저장·보안 |
+| [api-design.md](docs/api-design.md)             | REST API 설계                                 |
+| [development-plan.md](docs/development-plan.md) | 단계별 개발 계획                              |
+| [tech-decisions.md](docs/tech-decisions.md)     | 기술 의사결정 기록                            |
+| [design-system.md](docs/design-system.md)       | 디자인 토큰·공통 컴포넌트·화면 작성 규칙    |
 
 ## 폴더 구조
 
@@ -70,15 +71,18 @@ blog2shorts/
 │   ├── app/
 │   │   ├── main.py               # create_app(), CORS, 라우터 등록
 │   │   ├── core/config.py        # 환경변수 설정 (pydantic-settings)
-│   │   ├── api/v1/               # router.py, health.py
-│   │   └── schemas/              # 요청/응답 Pydantic 모델
+│   │   ├── api/v1/               # 상태·콘텐츠·이미지·대본·영상·음악 API
+│   │   ├── schemas/              # 요청/응답 Pydantic 모델
+│   │   └── services/             # 추출·대본·TTS·자막·렌더링·음악 처리
+│   ├── assets/                   # 폰트, 로고, 배경음악
+│   ├── scripts/                  # 수동 점검 스크립트
 │   └── tests/
 ├── backend.sh / frontend.sh     # 개발 서버 실행 스크립트
 ├── .gitignore
 └── README.md
 ```
 
-화면은 [디자인 시스템](docs/design-system.md)의 토큰과 공통 컴포넌트만으로 만듭니다(페이지에 색·px·전용 CSS 금지). 공통 컴포넌트 규칙: 여러 곳에서 쓰거나 기능과 무관한 UI는 `components/common/<이름>/`(컴포넌트 + `index.ts`), 특정 기능 전용은 `features/<기능>/`에 둡니다. 백엔드 비즈니스 로직은 기능 구현 시 `app/services/`에 추가합니다.
+화면은 [디자인 시스템](docs/design-system.md)의 토큰과 공통 컴포넌트만으로 만듭니다(페이지에 색·px·전용 CSS 금지). 공통 컴포넌트 규칙: 여러 곳에서 쓰거나 기능과 무관한 UI는 `components/common/<이름>/`(컴포넌트 + `index.ts`), 특정 기능 전용은 `features/<기능>/`에 둡니다. 백엔드 비즈니스 로직은 `app/services/`에 둡니다.
 
 ## 사전 요구사항
 
@@ -98,6 +102,28 @@ blog2shorts/
 ```
 
 처음 실행하면 `.env.example`을 복사해 `backend/.env`, `frontend/.env.local`을 만들고 의존성을 설치한 뒤 개발 서버를 띄웁니다. 포트는 `PORT=8001 ./backend.sh`처럼 바꿀 수 있습니다. 백엔드 포트를 바꾸면 `frontend/.env.local`의 `VITE_API_BASE_URL`도 같이 바꿔야 합니다.
+
+### Windows (PowerShell)
+
+`uv`는 [설치 안내](https://docs.astral.sh/uv/getting-started/installation/)를 참고해 설치합니다. `uv sync`가 Python 3.13을 자동으로 준비합니다. 백엔드와 프론트엔드는 각각 별도 터미널에서 실행합니다.
+
+```powershell
+# 터미널 1 — 백엔드
+Set-Location backend
+Copy-Item .env.example .env  # 최초 1회
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+```powershell
+# 터미널 2 — 프론트엔드
+Set-Location frontend
+Copy-Item .env.example .env.local  # 최초 1회
+npm install
+npm run dev
+```
+
+전체 흐름을 사용하려면 백엔드와 프론트엔드를 모두 실행하고, `backend/.env`에 `OPENAI_API_KEY`를 설정해야 합니다. 영상 합성에는 FFmpeg도 필요합니다.
 
 아래는 스크립트가 하는 일을 직접 실행하는 방법입니다.
 
@@ -129,13 +155,13 @@ npm run dev                   # http://localhost:5173
 
 ### `backend/.env`
 
-| 변수 | 기본값 | 설명 |
-|---|---|---|
-| `APP_ENV` | `development` | `development` \| `production` |
-| `CORS_ORIGINS` | `["http://localhost:5173","http://127.0.0.1:5173"]` | 허용할 프론트엔드 Origin (JSON 배열) |
-| `OPENAI_API_KEY` | (없음) | 대본·TTS 생성에 사용. **백엔드에만 설정** |
-| `NAVER_BLOG_IDS` | `["copper567"]` | 허용할 네이버 블로그 ID (예약, 현재 미사용) |
-| `STORAGE_DIR` | `backend/storage` | 이미지·영상 저장 경로 |
+| 변수               | 기본값                                                | 설명                                           |
+| ------------------ | ----------------------------------------------------- | ---------------------------------------------- |
+| `APP_ENV`        | `development`                                       | `development` \| `production`              |
+| `CORS_ORIGINS`   | `["http://localhost:5173","http://127.0.0.1:5173"]` | 허용할 프론트엔드 Origin (JSON 배열)           |
+| `OPENAI_API_KEY` | (없음)                                                | 대본·TTS 생성에 사용. **백엔드에만 설정**  |
+| `NAVER_BLOG_IDS` | `["copper567"]`                                     | 허용할 네이버 블로그 ID (예약, 현재 미사용) |
+| `STORAGE_DIR`    | `backend/storage`                                   | 이미지·영상 저장 경로                |
 
 `OPENAI_SCRIPT_MODEL`(기본 `gpt-4.1-mini`), `OPENAI_TTS_MODEL`(기본 `tts-1`)로 모델을 바꿀 수 있습니다. 대본 모델은 이미지 입력을 지원해야 합니다.
 
@@ -145,8 +171,8 @@ npm run dev                   # http://localhost:5173
 
 ### `frontend/.env.local`
 
-| 변수 | 예시 | 설명 |
-|---|---|---|
+| 변수                  | 예시                      | 설명                                              |
+| --------------------- | ------------------------- | ------------------------------------------------- |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | 백엔드 주소. 빌드 결과물에 포함되므로 비밀값 금지 |
 
 `.env`, `.env.local` 등은 `.gitignore`로 제외되며 `.env.example`만 커밋합니다.
@@ -165,19 +191,19 @@ npm run lint       # oxlint
 
 ## 현재 구현 상태
 
-| 항목 | 상태 |
-|---|---|
-| 요구사항·설계 문서 (`docs/`) | 완료 |
-| Backend: FastAPI 앱, 설정, CORS, `GET /api/v1/health`, 테스트 4개 | 완료 |
-| Frontend: 디자인 시스템(토큰·공통 컴포넌트 16종 + 레이아웃 2종), API 클라이언트 | 완료 |
-| Frontend: 5단계 화면 흐름 + 진행 방식 토글(장면 확인 후 만들기 / 처음부터 끝까지 자동), 장면 편집, 목소리·배경음악 선택, 중지 | 완료 |
-| 콘텐츠 입력·네이버 블로그 추출 (FR-01) | 완료 |
-| AI 대본 생성 (FR-02) | 완료 |
-| 장면 편집 (FR-03) | 프론트엔드 완료 (서버 저장 없음, 설계대로) |
-| TTS·자막 (FR-04) | 완료 |
-| 영상 합성 (FR-05) | 완료 |
-| 미리보기·다운로드 (FR-06) | 완료 |
-| 쇼츠 영상 디지인 (FR-7) | 구현중 | 
+| 항목                                                                                                                           | 상태                                       |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| 요구사항·설계 문서 (`docs/`)                                                                                                | 완료                                       |
+| Backend: FastAPI 앱, 설정, CORS, `GET /api/v1/health`, pytest 테스트                                                            | 완료                                       |
+| Frontend: 디자인 시스템(토큰·공통 컴포넌트 16종 + 레이아웃 2종), API 클라이언트                                               | 완료                                       |
+| Frontend: 5단계 화면 흐름 + 진행 방식 토글(장면 확인 후 만들기 / 처음부터 끝까지 자동), 장면 편집, 목소리·배경음악 선택, 중지 | 완료                         |
+| 콘텐츠 입력·네이버 블로그 추출 (FR-01)                                                                                        | 완료                                       |
+| AI 대본 생성 (FR-02)                                                                                                           | 완료                                       |
+| 장면 편집 (FR-03)                                                                                                              | 프론트엔드 완료 (서버 저장 없음, 설계대로) |
+| TTS·자막 (FR-04)                                                                                                              | 완료                                       |
+| 영상 합성 (FR-05)                                                                                                              | 완료                                       |
+| 미리보기·다운로드 (FR-06)                                                                                                     | 완료                                       |
+| 쇼츠 영상 디지인 (FR-7)                                                                                                        | 구현중                                     |
 
 ## 향후 개발 계획
 
