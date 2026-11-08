@@ -9,6 +9,7 @@ export const VOICE_OPTIONS = [
 
 export const MUSIC_OPTIONS = [
   { value: 'none', label: '배경음악 없음' },
+  { value: 'salsa_new_york', label: '살사 (Salsa Estilo New York 03)' },
   { value: 'soft_piano', label: '잔잔한 피아노' },
   { value: 'light_acoustic', label: '경쾌한 어쿠스틱' },
   { value: 'dreamy_synth', label: '몽환적인 신스' },

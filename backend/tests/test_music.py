@@ -1,5 +1,7 @@
 """배경음악 카탈로그와 목록 API 테스트."""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -55,3 +57,13 @@ def test_music_list_api(music_dir):
             {"id": "light_acoustic", "label": "경쾌한 어쿠스틱"},
         ]
     }
+
+
+def test_real_music_file_is_not_tracked_by_git():
+    """음원 원본은 라이선스상 저장소에 올리지 않는다."""
+
+    gitignore = (
+        Path(__file__).resolve().parents[2] / ".gitignore"
+    ).read_text(encoding="utf-8")
+
+    assert "backend/assets/music/*" in gitignore

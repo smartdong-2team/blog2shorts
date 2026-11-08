@@ -11,6 +11,7 @@ MUSIC_DIR = Path(__file__).resolve().parents[2] / "assets" / "music"
 NO_MUSIC = "none"
 
 MUSIC_LABELS = {
+    "salsa_new_york": "살사 (Salsa Estilo New York 03)",
     "soft_piano": "잔잔한 피아노",
     "light_acoustic": "경쾌한 어쿠스틱",
     "dreamy_synth": "몽환적인 신스",
