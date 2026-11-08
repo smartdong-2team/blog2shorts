@@ -3,12 +3,16 @@
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-xl);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .step {
   display: flex;
   align-items: center;
   gap: var(--space-6);
+  min-height: 20px;
   font-size: var(--font-size-micro);
   font-weight: 600;
   color: var(--color-text-muted);
@@ -34,27 +38,74 @@
   font-variant-numeric: tabular-nums;
 }
 
-.spinner {
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--color-accent);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin var(--duration-spin) linear infinite;
-}
-
 .check {
   font-weight: 700;
   color: var(--color-accent);
 }
 
+/* 오른쪽 위 상태 배지 (진행 중·확인 대기·실패·중지됨) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  /* 한글 글꼴이 줄 상자 위쪽에 붙어 그려져서 위 여백을 1px 더 줘 가운데로 맞춘다 */
+  padding: 4px 8px 3px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--color-text-soft);
+  background: var(--color-subtle);
+}
+
+.spinner {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  /* 배지 위 여백을 글자 맞춤용으로 1px 더 줬으니 아이콘은 1px 올려 배지 가운데에 둔다 */
+  margin-top: -1px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: step-spin var(--duration-spin) linear infinite;
+}
+
+/* 대기: 아직 차례가 아닌 단계는 흐리게 */
+.idle .title {
+  color: var(--color-text-muted);
+}
+
+/* 진행 중: 초록 테두리 + 바깥 빛 + 배지 */
 .running {
   border-color: var(--color-accent);
+  box-shadow:
+    inset 0 0 0 1px var(--color-accent),
+    0 0 0 4px var(--color-accent-bg);
+}
+
+.running .step {
+  color: var(--color-accent);
+}
+
+.running .badge {
+  color: var(--color-surface);
+  background: var(--color-accent);
+}
+
+.running .message {
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .waiting {
   border-color: var(--color-text);
   box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.waiting .badge {
+  color: var(--color-surface);
+  background: var(--color-text);
 }
 
 .waiting .message {
@@ -72,10 +123,33 @@
   border-color: var(--color-danger-line);
 }
 
+.error .badge {
+  color: var(--color-surface);
+  background: var(--color-danger);
+}
+
 .error .message {
   color: var(--color-danger);
 }
 
 .cancelled {
   background: var(--color-subtle);
+}
+
+.cancelled .badge {
+  background: var(--color-surface);
+}
+
+/* CSS Modules는 keyframes 이름도 파일 안으로 가두므로 여기서 직접 정의한다 */
+@keyframes step-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
