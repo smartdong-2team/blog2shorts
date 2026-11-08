@@ -1,8 +1,9 @@
 
 import asyncio
+import logging
 import tempfile
+import textwrap
 from pathlib import Path
-import time
 import os
 
 
@@ -13,6 +14,8 @@ from app.schemas.video import (
     VideoRenderRequest,
     VideoRenderResult,
 )
+
+logger = logging.getLogger(__name__)
 
 # 로고 이미지 경로
 LOGO_PATH = (
@@ -29,12 +32,67 @@ IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 780
 IMAGE_Y = 580
 
+# 자막 블록의 세로 중심
+SUBTITLE_CENTER_Y = 1270
 
+SCENE_TIMEOUT_SEC = 60
+CONCAT_TIMEOUT_SEC = 120
+
+# FFmpeg 오류 로그에 남길 마지막 글자 수
+STDERR_TAIL_CHARS = 2000
 
 
 class VideoRenderingError(Exception):
     """FFmpeg 영상 렌더링 실패 시 발생하는 오류."""
 
+
+# FFmpeg 실행
+async def run_ffmpeg(
+    command: list[str],
+    timeout_sec: float,
+    failure_message: str,
+) -> None:
+    """FFmpeg를 실행하고, 시간 초과·취소 시 프로세스를 함께 종료한다."""
+
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    try:
+        _, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=timeout_sec,
+        )
+
+    except asyncio.TimeoutError:
+        await _kill_process(process)
+        raise VideoRenderingError(
+            f"{failure_message}: 시간 초과 ({timeout_sec:g}초)"
+        ) from None
+
+    except asyncio.CancelledError:
+        await _kill_process(process)
+        raise
+
+    if process.returncode != 0:
+        logger.error(
+            "%s (종료 코드 %s): %s",
+            failure_message,
+            process.returncode,
+            (stderr or b"").decode("utf-8", "replace")[-STDERR_TAIL_CHARS:],
+        )
+        raise VideoRenderingError(
+            f"{failure_message} (종료 코드: {process.returncode})"
+        )
+
+
+async def _kill_process(process) -> None:
+    if process.returncode is None:
+        process.kill()
+        await process.wait()
 
 
 # 시간 관련 유틸리티
@@ -77,73 +135,106 @@ def normalize_subtitles(
     return normalized
 
 
+# FFmpeg 필터 옵션에 사용되는 특수문자 이스케이프
+def escape_filter_value(value: str) -> str:
+    return (
+        value
+        .replace("\\", "\\\\")
+        .replace(":", "\\:")
+        .replace("'", r"\'")
+        .replace(",", r"\,")
+        .replace("[", r"\[")
+        .replace("]", r"\]")
+    )
+
+
+def escape_drawtext_value(text: str) -> str:
+    """text='...' 안에 넣을 문자열을 이스케이프한다.
+
+    작은따옴표는 FFmpeg 필터 문법상 그대로 둘 수 없어 같은 모양의 ’로 바꾼다.
+    %는 expansion=none으로 그대로 그리므로 이스케이프하지 않는다.
+    """
+
+    return (
+        text
+        .replace("\\", "\\\\")
+        .replace("'", "’")
+        .replace(":", "\\:")
+        .replace(",", "\\,")
+        .replace("[", "\\[")
+        .replace("]", "\\]")
+        .replace(";", "\\;")
+    )
+
+
 # 자막 필터
 def build_subtitle_filter(
     subtitles: list[SubtitleCue],
 ) -> str:
-    """장면 기준 자막 목록을 FFmpeg drawtext 필터로 변환한다."""
+    """장면 기준 자막 목록을 FFmpeg drawtext 필터로 변환한다.
+
+    자막의 줄바꿈마다 drawtext를 하나씩 만들어 줄별로 가운데 정렬한다.
+    """
 
     if not subtitles:
         return ""
 
-    # FFmpeg 필터 옵션에 사용되는 특수문자 이스케이프
-    def escape_filter_value(value: str) -> str:
-        return (
-            value
-            .replace("\\", "\\\\")
-            .replace(":", "\\:")
-            .replace("'", r"\'")
-            .replace(",", r"\,")
-            .replace("[", r"\[")
-            .replace("]", r"\]")
-            .replace("%", r"\%")
-        )
-
-    filters = []
-
     style = SUBTITLE_STYLES["default"]  # 현재는 단일 스타일만 사용
     style_font = Path(style["font_file"])
 
-    for subtitle in subtitles:
-        text = escape_filter_value(subtitle.text)
-
-        if not style_font.is_file():
-            raise FileNotFoundError(
-                f"자막 폰트 파일을 찾을 수 없습니다: {style_font}"
-            )
-
-        font = escape_filter_value(str(style_font))
-
-        # 자막 스타일 설정
-        font_color = style["color"]
-        font_size = style["font_size"]
-        outline_color = style["outline_color"]
-        outline_width = style["outline_width"]
-
-        # 배경 색상 및 투명도
-        background_color = style["background_color"]
-        background_opacity = style["background_opacity"]
-        background_padding = style["background_padding"]
-
-        # FFmpeg 색상 형식: #000000@0.65
-        box_color = f"{background_color}@{background_opacity}"
-
-        filters.append(
-            "drawtext="
-            f"fontfile='{font}':"
-            f"text='{text}':"
-            f"fontcolor={font_color}:"
-            f"fontsize={font_size}:"
-            f"borderw={outline_width}:"
-            f"bordercolor={outline_color}:"
-            "box=1:"
-            f"boxcolor={box_color}:"
-            f"boxborderw={background_padding}:"
-            "x=(w-text_w)/2:"
-            "y=1280-text_h/2:"
-            f"enable='between(t,{subtitle.start_sec:.3f},"
-            f"{subtitle.end_sec:.3f})'"
+    if not style_font.is_file():
+        raise FileNotFoundError(
+            f"자막 폰트 파일을 찾을 수 없습니다: {style_font}"
         )
+
+    font = escape_filter_value(str(style_font))
+
+    # 자막 스타일 설정
+    font_color = style["color"]
+    font_size = style["font_size"]
+    outline_color = style["outline_color"]
+    outline_width = style["outline_width"]
+
+    # 배경 색상 및 투명도
+    background_color = style["background_color"]
+    background_opacity = style["background_opacity"]
+    background_padding = style["background_padding"]
+
+    # FFmpeg 색상 형식: #000000@0.65
+    box_color = f"{background_color}@{background_opacity}"
+
+    # 줄 배경이 겹치지 않고 맞닿는 줄 간격
+    line_height = font_size + background_padding * 2
+
+    filters = []
+
+    for subtitle in subtitles:
+        lines = subtitle.text.splitlines()
+
+        for index, line in enumerate(lines):
+            center_y = (
+                SUBTITLE_CENTER_Y
+                + (index - (len(lines) - 1) / 2) * line_height
+            )
+            y = round(center_y - font_size / 2)
+
+            filters.append(
+                "drawtext="
+                f"fontfile='{font}':"
+                f"text='{escape_drawtext_value(line)}':"
+                "expansion=none:"
+                f"fontcolor={font_color}:"
+                f"fontsize={font_size}:"
+                f"borderw={outline_width}:"
+                f"bordercolor={outline_color}:"
+                "box=1:"
+                f"boxcolor={box_color}:"
+                f"boxborderw={background_padding}:"
+                "x=(w-text_w)/2:"
+                f"y={y}:"
+                f"enable='between(t,{subtitle.start_sec:.3f},"
+                f"{subtitle.end_sec:.3f})'"
+            )
 
     return ",".join(filters)
 
@@ -172,15 +263,12 @@ def build_hook_filter(hook_text: str) -> str:
 
     # 줄바꿈이 없는 긴 문장만 자동 분할
     if len(lines) == 1 and len(lines[0]) > 16:
-        import textwrap
-
         lines = textwrap.wrap(
             lines[0],
             width=16,
             break_long_words=False,
             break_on_hyphens=False,
         )
-
 
     # 가장 긴 줄을 기준으로 글자 크기 조절
     max_length = max(len(line) for line in lines)
@@ -194,37 +282,24 @@ def build_hook_filter(hook_text: str) -> str:
 
     line_height = int(fontsize * 1.3)
 
-    # 상단 영역 중앙 부근에 배치
     # 상단 훅 영역의 중앙을 기준으로 배치
     hook_center_y = 290
 
     total_height = (len(lines) - 1) * line_height + fontsize
     start_y = int(hook_center_y - total_height / 2)
 
-    font = (
-        str(font_file)
-        .replace("\\", r"\\")
-        .replace(":", r"\:")
-    )
+    font = escape_filter_value(str(font_file))
 
     filters = []
 
     for index, line in enumerate(lines):
-        text = (
-            line
-            .replace("\\", r"\\")
-            .replace(":", r"\:")
-            .replace("'", r"\'")
-            .replace(",", r"\,")
-            .replace("%", r"\%")
-        )
-
         y = start_y + index * line_height
 
         filters.append(
             "drawtext="
             f"fontfile='{font}':"
-            f"text='{text}':"
+            f"text='{escape_drawtext_value(line)}':"
+            "expansion=none:"
             "fontcolor=white:"
             f"fontsize={fontsize}:"
             "borderw=4:"
@@ -234,8 +309,6 @@ def build_hook_filter(hook_text: str) -> str:
         )
 
     return ",".join(filters)
-# 단일 씬 생성 함수
-
 
 
 # 모션 필터
@@ -312,18 +385,16 @@ def build_motion_filter(
     )
 
 
+# 단일 씬 생성 함수
 async def render_scene(
     scene: RenderScene,
     output_path: Path,
     settings: VideoSettings | None = None,
-    scene_start_sec: float = 0.0,
-    font_file: Path | None = None,
     hook_text: str = "",
 ) -> Path:
+    """이미지·음성·훅·자막·로고를 합성하여 단일 장면 MP4를 생성한다.
 
-    """이미지와 음성을 합성하여 단일 장면 MP4를 생성한다.
-
-    현재 버전은 자막을 합성하지 않는다.
+    scene.subtitles의 시간은 장면 시작을 0으로 하는 장면 기준 시간이다.
     """
 
     settings = settings or VideoSettings()
@@ -348,10 +419,8 @@ async def render_scene(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    motion = getattr(scene, "motion", "zoom_in")
-
     motion_filter = build_motion_filter(
-        motion=motion,
+        motion=scene.motion,
         duration_sec=scene.audio.duration_sec,
         fps=settings.fps,
     )
@@ -370,30 +439,11 @@ async def render_scene(
         if hook_filter:
             image_filter = f"{image_filter},{hook_filter}"
 
-    
-    print("[DEBUG] 자막 시간 계산 시작", flush=True)
-    # 전체 영상 기준 자막을 현재 장면 기준으로 변환
-    print(
-        f"[Subtitle DEBUG] "
-        f"scene={scene.order}, "
-        f"scene_start={scene_start_sec}, "
-        f"duration={scene.audio.duration_sec}, "
-        f"subtitles={scene.subtitles}"
-    )
+    # 음성 길이를 벗어나는 자막 정리
     local_subtitles = normalize_subtitles(
         subtitles=scene.subtitles,
         scene_start_sec=0.0,
         scene_duration_sec=scene.audio.duration_sec,
-    )
-
-    print(
-        f"[Subtitle DEBUG] "
-        f"scene={scene.order} "
-        f"scene_start={scene_start_sec:.2f} "
-        f"duration={scene.audio.duration_sec:.2f} "
-        f"input={scene.subtitles} "
-        f"output={local_subtitles}",
-        flush=True,
     )
 
     # 자막이 있는 경우에만 drawtext 필터 추가
@@ -444,23 +494,11 @@ async def render_scene(
     ]
 
     try:
-
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=None,
+        await run_ffmpeg(
+            command,
+            timeout_sec=SCENE_TIMEOUT_SEC,
+            failure_message="FFmpeg 렌더링 실패",
         )
-
-        await asyncio.wait_for(
-            process.wait(),
-            timeout=60,
-        )
-
-        if process.returncode != 0:
-            raise VideoRenderingError(
-                f"FFmpeg 렌더링 실패 (종료 코드: {process.returncode})"
-            )
 
         if not output_path.is_file():
             raise VideoRenderingError(
@@ -469,24 +507,14 @@ async def render_scene(
 
         return output_path
 
-    except asyncio.TimeoutError:
-        process.kill()
-        await process.wait()
-        output_path.unlink(missing_ok=True)
-        raise VideoRenderingError(
-            "FFmpeg 렌더링 시간 초과 (60초)"
-        )
-
-    except Exception:
+    except BaseException:
         output_path.unlink(missing_ok=True)
         raise
-
 
 
 # 씬을 연결해 하나의 MP4로 합성
 async def render_video(
     request: VideoRenderRequest,
-    font_file: Path | None = None,
 ) -> VideoRenderResult:
     """여러 장면을 렌더링하고 하나의 MP4로 연결한다."""
 
@@ -502,30 +530,23 @@ async def render_video(
         temp_path = Path(temp_dir)
 
         scene_paths: list[Path] = []
-        scene_start_sec = 0.0
+        duration_sec = 0.0
 
-        # 1. 각 장면을 개별 MP4로 렌더링
         # 1. 각 장면을 개별 MP4로 렌더링
         for scene in request.scenes:
             scene_output = (
                 temp_path / f"scene-{scene.order:03d}.mp4"
             )
 
-            start = time.perf_counter()
-
-
             await render_scene(
                 scene=scene,
                 output_path=scene_output,
                 settings=request.settings,
-                scene_start_sec=scene_start_sec,
-                font_file=font_file,
                 hook_text=request.hook_text,
             )
 
-
             scene_paths.append(scene_output)
-            scene_start_sec += scene.audio.duration_sec
+            duration_sec += scene.audio.duration_sec
 
         # 2. FFmpeg concat 목록 생성
         concat_file = temp_path / "concat.txt"
@@ -538,51 +559,35 @@ async def render_video(
             encoding="utf-8",
         )
 
-        # 3. 장면 영상 연결
-        command = [
-            FFMPEG_BIN,
-            "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", str(concat_file),
-            "-c", "copy",
-            "-movflags", "+faststart",
-            str(output_path),
-        ]
-
         try:
-
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=None,
+            # 3. 장면 영상 연결
+            await run_ffmpeg(
+                [
+                    FFMPEG_BIN,
+                    "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", str(concat_file),
+                    "-c", "copy",
+                    "-movflags", "+faststart",
+                    str(output_path),
+                ],
+                timeout_sec=CONCAT_TIMEOUT_SEC,
+                failure_message="FFmpeg 장면 연결 실패",
             )
-
-            print(
-                f"[FFmpeg] 프로세스 시작됨 (PID: {process.pid})",
-                flush=True,
-            )
-
-            await process.wait()
-
-
-            if process.returncode != 0:
-                raise VideoRenderingError(
-                    f"FFmpeg 장면 연결 실패 (종료 코드: {process.returncode})"
-                )
 
             if not output_path.is_file():
                 raise VideoRenderingError(
                     "FFmpeg 실행 후 최종 영상이 생성되지 않았습니다."
                 )
 
-        except Exception:
+        except BaseException:
             output_path.unlink(missing_ok=True)
             raise
 
     return VideoRenderResult(
         path=output_path,
-        duration_sec=scene_start_sec,
+        duration_sec=duration_sec,
         width=request.settings.width,
         height=request.settings.height,
         fps=request.settings.fps,

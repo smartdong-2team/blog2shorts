@@ -1,5 +1,4 @@
 
-import time
 from pathlib import Path
 from uuid import UUID
 
@@ -11,24 +10,18 @@ from app.schemas.video import (
 )
 from app.services.audio_pipeline import generate_scene_audio
 from app.services.storage import get_asset
+from app.services.subtitles import create_narration_cues
 from app.services.video_render import render_video
-from app.schemas.audio import SubtitleCue
 
 
 async def generate_video(
     request: VideoCreateRequest,
     output_path: Path,
     work_dir: Path,
-    font_file: Path | None = None,
 ) -> VideoRenderResult:
-    """이미지 조회 → TTS/자막 생성 → 영상 렌더링."""
-
-    total_start = time.perf_counter()
+    """이미지 조회 → TTS 생성 → 자막 분할 → 영상 렌더링."""
 
     # 1. 입력 이미지 확인
-    start = time.perf_counter()
-    print("[Pipeline] 이미지 조회 시작", flush=True)
-
     image_paths = {}
 
     for scene in request.scenes:
@@ -41,43 +34,22 @@ async def generate_video(
 
         image_paths[scene.asset_id] = asset.path
 
-    print(
-        f"[Pipeline] 이미지 조회 완료: "
-        f"{time.perf_counter() - start:.2f}초",
-        flush=True,
-    )
-
-    # 2. TTS 및 자막 생성
-    start = time.perf_counter()
-    print("[Pipeline] TTS + 자막 생성 시작", flush=True)
-
+    # 2. 장면별 TTS 생성
     audio_result = await generate_scene_audio(
         scenes=request.scenes,
         output_dir=work_dir / "audio",
         voice=request.voice or "alloy",
     )
 
-    print(
-        f"[Pipeline] TTS + 자막 생성 완료: "
-        f"{time.perf_counter() - start:.2f}초",
-        flush=True,
-    )
-
     # 3. 렌더링에 필요한 장면 데이터 구성
-    start = time.perf_counter()
-    print("[Pipeline] 렌더링 데이터 구성 시작", flush=True)
-
-    render_scenes = []
-    scene_start_sec = 0.0
-
-    # 원본 요청에서 장면별 데이터 가져오기
     scene_input_by_order = {
         scene.order: scene
         for scene in request.scenes
     }
 
+    render_scenes = []
+
     for scene in audio_result.scenes:
-        # 해당 장면의 원본 요청 데이터
         original = scene_input_by_order[scene.order]
 
         render_scenes.append(
@@ -86,35 +58,20 @@ async def generate_video(
                 narration=original.narration,
                 image_path=image_paths[UUID(scene.asset_id)],
                 audio=scene.audio,
-                subtitles=[
-                    SubtitleCue(
-                        text=original.narration,
-                        start_sec=scene_start_sec,
-                        end_sec=scene_start_sec + scene.audio.duration_sec,
-                    )
-                ],
+                # 음성 전체를 자막으로 보여주되, 화면 폭에 맞게 나눈다
+                subtitles=create_narration_cues(
+                    narration=original.narration,
+                    duration_sec=scene.audio.duration_sec,
+                ),
                 motion=original.motion,
             )
         )
 
-    render_request = VideoRenderRequest(
-        scenes=render_scenes,
-        output_path=output_path,
-        hook_text=request.hook_text,
-    )
-
-
     # 4. 최종 영상 렌더링
-    start = time.perf_counter()
-
-    result = await render_video(
-        render_request,
-        font_file=font_file,
+    return await render_video(
+        VideoRenderRequest(
+            scenes=render_scenes,
+            output_path=output_path,
+            hook_text=request.hook_text,
+        )
     )
-
-
-    # 5. 전체 소요 시간
-    total_elapsed = time.perf_counter() - total_start
-
-
-    return result

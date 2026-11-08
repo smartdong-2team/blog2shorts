@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from fastapi import Response
 
+from app.core.config import get_settings
 from app.core.errors import classify_error
 from app.schemas.video import VideoCreateRequest
 from app.services.video_pipeline import generate_video
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
-OUTPUT_DIR = Path("output/videos")
+OUTPUT_DIR = get_settings().storage_dir / "videos"
 
 # 임시 작업 저장소
 # 이후 GET /videos/{job_id}에서도 사용
@@ -58,9 +59,6 @@ async def run_video_job(
             request=request,
             output_path=output_path,
             work_dir=work_dir,
-            font_file=Path(
-                "/System/Library/Fonts/Supplemental/AppleGothic.ttf"
-            ),
         )
 
         video_jobs[job_id]["status"] = "completed"
@@ -167,9 +165,7 @@ async def check_video_ready(job_id: str):
             detail="영상이 아직 생성 중입니다.",
         )
 
-    output_path = Path("output/videos") / f"{job_id}.mp4"
-
-    if not output_path.is_file():
+    if not Path(job["output_path"]).is_file():
         raise HTTPException(
             status_code=404,
             detail="영상 파일을 찾을 수 없습니다.",

@@ -4,6 +4,10 @@ from pydantic import ValidationError
 
 from app.schemas.audio import SubtitleCue
 from app.services.subtitles import (
+    SUBTITLE_MAX_WIDTH,
+    create_narration_cues,
+    split_into_pages,
+    text_width,
     create_subtitle,
     create_subtitle_timeline,
 )
@@ -159,3 +163,81 @@ def test_create_subtitle_timeline_is_continuous():
         assert current.start_sec == pytest.approx(previous.end_sec)
 
     assert subtitles[-1].end_sec == pytest.approx(7.5)
+
+
+# --------------------------------------------------
+# 내레이션을 화면 폭에 맞는 자막 페이지로 분할
+# --------------------------------------------------
+LONG_NARRATION = (
+    "엔진, 섀시, 전기 세 과목을 먼저 나눠서 보고 기출문제를 세 번 "
+    "반복하면 합격선에 빠르게 가까워져요. 오답 노트도 꼭 만들어 보세요."
+)
+
+
+def test_split_into_pages_fits_screen_width_and_two_lines():
+    pages = split_into_pages(LONG_NARRATION)
+
+    assert len(pages) > 1
+
+    for page in pages:
+        lines = page.split("\n")
+        assert len(lines) <= 2
+        assert all(
+            text_width(line) <= SUBTITLE_MAX_WIDTH
+            for line in lines
+        )
+
+
+def test_split_into_pages_keeps_every_word_in_order():
+    pages = split_into_pages(LONG_NARRATION)
+
+    assert " ".join(pages).replace("\n", " ") == LONG_NARRATION
+
+
+def test_split_into_pages_breaks_at_sentence_boundary():
+    pages = split_into_pages("짧은 첫 문장이에요. 짧은 둘째 문장이에요.")
+
+    assert pages == ["짧은 첫 문장이에요.", "짧은 둘째 문장이에요."]
+
+
+def test_split_into_pages_avoids_single_word_page():
+    pages = split_into_pages(LONG_NARRATION.split(".")[0] + " 끝")
+
+    assert all(len(page.split()) > 1 for page in pages)
+
+
+def test_split_into_pages_hard_breaks_very_long_word():
+    pages = split_into_pages("가" * 60)
+
+    assert "".join(pages).replace("\n", "") == "가" * 60
+
+    for page in pages:
+        assert all(
+            text_width(line) <= SUBTITLE_MAX_WIDTH
+            for line in page.split("\n")
+        )
+
+
+def test_create_narration_cues_cover_duration_without_gaps():
+    cues = create_narration_cues(LONG_NARRATION, 12.0)
+
+    assert cues[0].start_sec == pytest.approx(0.0)
+    assert cues[-1].end_sec == pytest.approx(12.0)
+
+    for previous, current in zip(cues, cues[1:]):
+        assert previous.end_sec == pytest.approx(current.start_sec)
+
+
+def test_create_narration_cues_gives_longer_page_more_time():
+    cues = create_narration_cues(
+        "네. 이 문장은 앞 문장보다 훨씬 길어요.",
+        6.0,
+    )
+    durations = [cue.end_sec - cue.start_sec for cue in cues]
+
+    assert durations[0] < durations[1]
+
+
+def test_create_narration_cues_rejects_empty_text():
+    with pytest.raises(ValueError):
+        create_narration_cues("   ", 3.0)

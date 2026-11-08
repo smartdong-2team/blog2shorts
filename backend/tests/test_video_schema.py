@@ -24,6 +24,7 @@ from app.schemas.video import (
 def make_render_scene(order: int = 1) -> RenderScene:
     return RenderScene(
         order=order,
+        narration="테스트 내레이션",
         image_path=Path(f"images/scene-{order}.jpg"),
         audio=AudioAsset(
             path=f"audio/scene-{order}.wav",

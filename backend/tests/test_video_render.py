@@ -1,17 +1,24 @@
 
+import asyncio
+import re
+import shutil
+import subprocess
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from app.schemas.audio import AudioAsset,SubtitleCue
 from app.schemas.video import RenderScene, VideoSettings,VideoRenderRequest
+from app.services.subtitle_styles import SUBTITLE_STYLES
 from app.services.video_render import (
     VideoRenderingError,
     render_scene,
     normalize_subtitles,
     build_subtitle_filter,
-    render_video
+    render_video,
+    run_ffmpeg,
+    FFMPEG_BIN,
 )
 
 
@@ -30,6 +37,7 @@ def make_scene(tmp_path: Path) -> RenderScene:
 
     return RenderScene(
         order=1,
+        narration="테스트 내레이션",
         image_path=image_path,
         audio=AudioAsset(
             path=str(audio_path),
@@ -100,7 +108,7 @@ async def test_render_scene_uses_default_settings(tmp_path):
     assert command[0] == "ffmpeg"
     assert "-framerate" in command
     assert command[command.index("-framerate") + 1] == "30"
-    assert "scale=1080:1920" in " ".join(command)
+    assert "pad=1080:1920" in " ".join(command)
 
 
 @pytest.mark.asyncio
@@ -132,7 +140,6 @@ async def test_render_scene_custom_settings(tmp_path):
     command = mock_subprocess.call_args.args
     command_text = " ".join(command)
 
-    assert "scale=720:1280" in command_text
     assert "pad=720:1280" in command_text
     assert command[command.index("-r") + 1] == "24"
 
@@ -142,23 +149,11 @@ async def test_render_scene_custom_settings(tmp_path):
 # ==========================================================
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "image_fit,expected_filter",
-    [
-        ("cover", "crop=1080:1920"),
-        ("contain", "pad=1080:1920"),
-    ],
-)
-async def test_render_scene_image_fit(
-    tmp_path,
-    image_fit,
-    expected_filter,
-):
-    """cover/contain에 따른 이미지 필터 적용 확인."""
+async def test_render_scene_layout(tmp_path):
+    """사진 영역을 채운 뒤 9:16 검은 화면에 배치한다."""
 
     scene = make_scene(tmp_path)
     output_path = tmp_path / "scene.mp4"
-    settings = VideoSettings(image_fit=image_fit)
 
     process = make_mock_process()
 
@@ -170,11 +165,12 @@ async def test_render_scene_image_fit(
         "app.services.video_render.asyncio.create_subprocess_exec",
         side_effect=mock_exec,
     ) as mock_subprocess:
-        await render_scene(scene, output_path, settings)
+        await render_scene(scene, output_path)
 
     command_text = " ".join(mock_subprocess.call_args.args)
 
-    assert expected_filter in command_text
+    assert "crop=2160:1560" in command_text
+    assert "pad=1080:1920:0:580:black" in command_text
 
 
 # ==========================================================
@@ -414,24 +410,18 @@ def test_build_subtitle_filter():
         )
     ]
 
-    result = build_subtitle_filter(
-        subtitles=subtitles,
-        font_file=Path("/tmp/test-font.ttf"),
-    )
+    result = build_subtitle_filter(subtitles=subtitles)
 
     assert "drawtext=" in result
     assert "안녕하세요" in result
-    assert "fontcolor=white" in result
+    assert "fontcolor=#FFFFFF" in result
     assert "between(t,0.000,2.500)" in result
 
 
 def test_build_subtitle_filter_empty():
     """자막이 없으면 필터를 생성하지 않는다."""
 
-    result = build_subtitle_filter(
-        subtitles=[],
-        font_file=Path("/tmp/test-font.ttf"),
-    )
+    result = build_subtitle_filter(subtitles=[])
 
     assert result == ""
 
@@ -452,10 +442,7 @@ def test_build_subtitle_filter_multiple_cues():
         ),
     ]
 
-    result = build_subtitle_filter(
-        subtitles=subtitles,
-        font_file=Path("/tmp/test-font.ttf"),
-    )
+    result = build_subtitle_filter(subtitles=subtitles)
 
     assert result.count("drawtext=") == 2
     assert "첫 번째 자막" in result
@@ -474,16 +461,12 @@ async def test_render_scene_with_subtitles(tmp_path):
     scene.subtitles = [
         SubtitleCue(
             text="테스트 자막",
-            start_sec=3.0,
-            end_sec=5.5,
+            start_sec=0.0,
+            end_sec=2.5,
         )
     ]
 
     output_path = tmp_path / "scene.mp4"
-
-    # 실제 폰트가 아니라 존재 여부 확인용 임시 파일
-    font_path = tmp_path / "test-font.ttf"
-    font_path.write_bytes(b"fake font")
 
     process = make_mock_process()
 
@@ -498,8 +481,6 @@ async def test_render_scene_with_subtitles(tmp_path):
         result = await render_scene(
             scene=scene,
             output_path=output_path,
-            scene_start_sec=3.0,
-            font_file=font_path,
         )
 
     command_text = " ".join(mock_subprocess.call_args.args)
@@ -511,7 +492,7 @@ async def test_render_scene_with_subtitles(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_render_scene_missing_font(tmp_path):
+async def test_render_scene_missing_font(tmp_path, monkeypatch):
     """자막이 있는데 폰트 파일이 없으면 오류가 발생한다."""
 
     scene = make_scene(tmp_path)
@@ -523,6 +504,12 @@ async def test_render_scene_missing_font(tmp_path):
         )
     ]
 
+    monkeypatch.setitem(
+        SUBTITLE_STYLES["default"],
+        "font_file",
+        tmp_path / "missing-font.ttf",
+    )
+
     output_path = tmp_path / "scene.mp4"
 
     with pytest.raises(FileNotFoundError, match="폰트"):
@@ -533,8 +520,8 @@ async def test_render_scene_missing_font(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_render_scene_without_subtitles_needs_no_font(tmp_path):
-    """자막이 없는 장면은 폰트 없이 렌더링할 수 있다."""
+async def test_render_scene_without_subtitles_has_no_drawtext(tmp_path):
+    """자막과 훅이 없는 장면에는 drawtext를 넣지 않는다."""
 
     scene = make_scene(tmp_path)
     output_path = tmp_path / "scene.mp4"
@@ -581,6 +568,7 @@ async def test_render_video_multiple_scenes(tmp_path):
         scenes.append(
             RenderScene(
                 order=order,
+                narration="테스트 내레이션",
                 image_path=image_path,
                 audio=AudioAsset(
                     path=str(audio_path),
@@ -598,8 +586,7 @@ async def test_render_video_multiple_scenes(tmp_path):
         scene,
         output_path,
         settings=None,
-        scene_start_sec=0.0,
-        font_file=None,
+        hook_text="",
     ):
         output_path.write_bytes(b"fake scene mp4")
         return output_path
@@ -638,10 +625,6 @@ async def test_render_video_multiple_scenes(tmp_path):
     assert [
         call["scene"].order for call in render_calls
     ] == [1, 2, 3]
-
-    assert [
-        call["scene_start_sec"] for call in render_calls
-    ] == pytest.approx([0.0, 1.0, 3.0])
 
     command = mock_subprocess.call_args.args
 
@@ -760,3 +743,105 @@ async def test_render_video_missing_final_output(tmp_path):
             await render_video(request)
 
     assert not request.output_path.exists()
+
+
+# ==========================================================
+# 10. 두 줄 자막과 특수문자
+# ==========================================================
+
+def test_build_subtitle_filter_draws_each_line_separately():
+    """줄바꿈마다 drawtext를 만들고 위아래로 나눠 배치한다."""
+
+    result = build_subtitle_filter(
+        subtitles=[
+            SubtitleCue(
+                text="첫째 줄\n둘째 줄",
+                start_sec=0.0,
+                end_sec=2.0,
+            )
+        ],
+    )
+
+    assert result.count("drawtext=") == 2
+    assert "첫째 줄" in result
+    assert "둘째 줄" in result
+
+    y_positions = [int(y) for y in re.findall(r":y=(\d+):", result)]
+    assert y_positions[0] < y_positions[1]
+
+
+@pytest.mark.skipif(
+    shutil.which(FFMPEG_BIN) is None,
+    reason="FFmpeg가 필요합니다.",
+)
+@pytest.mark.parametrize(
+    "text",
+    [
+        "합격률 50%",
+        "it's 특가",
+        "쉼표, 콜론: 포함",
+        "[한정] 세미콜론; 포함",
+        "역슬래시 C:\\경로",
+    ],
+)
+def test_subtitle_filter_accepts_special_characters(text):
+    """특수문자가 있어도 실제 FFmpeg가 필터를 처리할 수 있다."""
+
+    subtitle_filter = build_subtitle_filter(
+        subtitles=[
+            SubtitleCue(text=text, start_sec=0.0, end_sec=1.0)
+        ],
+    )
+
+    result = subprocess.run(
+        [
+            FFMPEG_BIN,
+            "-loglevel", "error",
+            "-f", "lavfi",
+            "-i", "color=c=gray:s=1080x1920:d=0.1",
+            "-filter_complex", f"[0:v]{subtitle_filter}[out]",
+            "-map", "[out]",
+            "-frames:v", "1",
+            "-f", "null",
+            "-",
+        ],
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
+
+
+# ==========================================================
+# 12. 중지 시 FFmpeg 종료
+# ==========================================================
+
+@pytest.mark.asyncio
+async def test_run_ffmpeg_kills_process_when_cancelled():
+    """작업이 취소되면 실행 중인 FFmpeg도 함께 종료한다."""
+
+    started = asyncio.Event()
+
+    async def never_finishes():
+        started.set()
+        await asyncio.Event().wait()
+
+    process = make_mock_process()
+    process.returncode = None
+    process.kill = Mock()
+    process.communicate = never_finishes
+
+    with patch(
+        "app.services.video_render.asyncio.create_subprocess_exec",
+        return_value=process,
+    ):
+        task = asyncio.create_task(
+            run_ffmpeg(["ffmpeg"], 60, "실패")
+        )
+        await started.wait()
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    process.kill.assert_called_once()
+    process.wait.assert_awaited_once()

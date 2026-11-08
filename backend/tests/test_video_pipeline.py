@@ -106,7 +106,11 @@ async def test_generate_video(monkeypatch, tmp_path):
 
     assert len(render_request.scenes) == 1
     assert render_request.scenes[0].image_path == image_path
-    assert render_request.scenes[0].subtitles[0].text == "테스트 자막"
+    # 화면 자막은 음성과 같은 내레이션을 장면 기준 시간으로 표시한다
+    cues = render_request.scenes[0].subtitles
+    assert cues[0].text == "테스트 내레이션"
+    assert cues[0].start_sec == pytest.approx(0.0)
+    assert cues[-1].end_sec == pytest.approx(3.0)
 
     # TTS 파이프라인이 호출되었는지 확인
     mock_audio.assert_awaited_once()
