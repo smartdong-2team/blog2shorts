@@ -10,22 +10,116 @@
   font-weight: 600;
 }
 
-.field {
-  padding: var(--space-10) var(--space-12);
+.root {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  width: 100%;
+  min-width: 96px;
+  height: 44px;
+  padding: 0 var(--space-12) 0 var(--space-14);
   font: inherit;
   font-size: var(--font-size-body);
+  text-align: left;
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
 
-.field:focus {
+.trigger:hover:not(:disabled) {
+  border-color: #cfccc4;
+}
+
+.trigger:focus-visible,
+.open,
+.open:hover:not(:disabled) {
   outline: none;
   border-color: var(--color-text);
 }
 
-.field:disabled {
+.trigger:disabled {
+  color: var(--color-text-muted);
   background: var(--color-subtle);
-  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: none;
+  color: var(--color-text-muted);
+  transition: transform 0.15s;
+}
+
+.open .chevron {
+  transform: rotate(180deg);
+}
+
+.list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  min-width: max-content;
+  max-height: 280px;
+  margin: 0;
+  padding: var(--space-6);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-floating);
+}
+
+.upward {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  height: 40px;
+  padding: 0 var(--space-10);
+  font-size: var(--font-size-body);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.active {
+  background: var(--color-subtle);
+}
+
+.selected {
+  font-weight: 600;
+}
+
+.check {
+  flex: none;
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .chevron {
+    transition: none;
+  }
 }

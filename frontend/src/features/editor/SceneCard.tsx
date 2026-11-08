@@ -92,7 +92,7 @@ export function SceneCard({
             ariaLabel={`장면 ${number} 움직임`}
             options={MOTION_OPTIONS}
             value={scene.motion}
-            onChange={(event) => onChange({ motion: event.target.value as Motion })}
+            onChange={(motion) => onChange({ motion: motion as Motion })}
             disabled={locked}
           />
         </div>

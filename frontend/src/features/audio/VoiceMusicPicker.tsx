@@ -36,14 +36,14 @@ export function VoiceMusicPicker({ audio, onChange, locked }: VoiceMusicPickerPr
           label="목소리"
           options={VOICE_OPTIONS}
           value={audio.voice}
-          onChange={(event) => onChange({ voice: event.target.value })}
+          onChange={(voice) => onChange({ voice })}
           disabled={locked}
         />
         <Select
           label="배경음악"
           options={musicOptions}
           value={audio.music}
-          onChange={(event) => onChange({ music: event.target.value })}
+          onChange={(music) => onChange({ music })}
           disabled={locked || noTracks}
         />
         <Range
