@@ -74,7 +74,11 @@ export interface ContentExtractResponse {
 }
 
 
-// api - videos.ts 관련 타입 정리 
+export interface MusicListResponse {
+  tracks: { id: string; label: string }[]
+}
+
+// api - videos.ts 관련 타입 정리
 export interface VideoCreateRequest {
   scenes: {
     order: number
@@ -85,6 +89,8 @@ export interface VideoCreateRequest {
     motion: Motion
   }[]
   voice: string | null
+  music: string
+  music_volume: number
   hook_text?: string
 }
 

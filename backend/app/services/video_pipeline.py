@@ -9,8 +9,10 @@ from app.schemas.video import (
     RenderScene,
 )
 from app.services.audio_pipeline import generate_scene_audio
+from app.services.music import NO_MUSIC, find_track, music_gain
 from app.services.storage import get_asset
 from app.services.subtitles import create_narration_cues
+from app.services.tts import DEFAULT_VOICE, OPENAI_VOICES
 from app.services.video_render import render_video
 
 
@@ -34,14 +36,25 @@ async def generate_video(
 
         image_paths[scene.asset_id] = asset.path
 
-    # 2. 장면별 TTS 생성
+    # 2. 배경음악 확인 (유료 TTS를 호출하기 전에 실패시킨다)
+    music_path = None
+
+    if request.music != NO_MUSIC:
+        music_path = find_track(request.music)
+
+        if music_path is None:
+            raise ValueError(
+                f"배경음악 파일을 찾을 수 없습니다: {request.music}"
+            )
+
+    # 3. 장면별 TTS 생성
     audio_result = await generate_scene_audio(
         scenes=request.scenes,
         output_dir=work_dir / "audio",
-        voice=request.voice or "alloy",
+        voice=OPENAI_VOICES[request.voice or DEFAULT_VOICE],
     )
 
-    # 3. 렌더링에 필요한 장면 데이터 구성
+    # 4. 렌더링에 필요한 장면 데이터 구성
     scene_input_by_order = {
         scene.order: scene
         for scene in request.scenes
@@ -67,11 +80,13 @@ async def generate_video(
             )
         )
 
-    # 4. 최종 영상 렌더링
+    # 5. 최종 영상 렌더링
     return await render_video(
         VideoRenderRequest(
             scenes=render_scenes,
             output_path=output_path,
             hook_text=request.hook_text,
+            music_path=music_path,
+            music_gain=music_gain(request.music_volume),
         )
     )

@@ -115,7 +115,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           dispatch({
             type: 'rendered',
             result: {
-              duration_sec: 0,
+              duration_sec: estimateSec(scenes),
               width: 1080,
               height: 1920,
               download_url: videoDownloadUrl(jobId),
@@ -161,6 +161,8 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     signal: AbortSignal,
     hookText: string,
   ) => {
+    const { audio } = stateRef.current
+
     const request = {
       scenes: scenes.map((scene, index) => ({
         order: index + 1,
@@ -170,7 +172,9 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         asset_id: scene.asset_id!,
         motion: scene.motion,
       })),
-      voice: null,
+      voice: audio.voice,
+      music: audio.music,
+      music_volume: audio.music_volume,
       hook_text: hookText,
     }
 
@@ -184,22 +188,16 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           throw new Error(`${missingImage + 1}번 장면에 이미지가 지정되지 않았습니다.`)
         }
 
-        console.log('영상 생성 요청 데이터:', request)
-        console.log('전달되는 훅 문구:', request.hook_text)
-
         return createVideo(request, signal)
       },
       (response) => `영상 생성 요청 접수 · ${response.job_id}`,
     )
 
-    console.log('영상 생성 작업:', result)
-    // 생성된 영상의 작업 ID 저장
+    // 202는 작업 접수이므로 아직 rendered 액션을 호출하지 않음
     dispatch({
       type: 'videoQueued',
       jobId: result.job_id,
     })
-
-    // 202는 작업 접수이므로 아직 rendered 액션을 호출하지 않음
   }
   /** 1단계부터 시작. 검토 모드는 3단계 후 멈추고, 자동 모드는 5단계까지 */
   const start = async (input: ContentInput) => {
@@ -214,8 +212,6 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         (c) => `본문 ${bodyChars(c.text).toLocaleString()}자 · 이미지 ${imageCount(c.text) || c.images.length}장`,
       )
       dispatch({ type: 'content', content })
-      console.log('백엔드에 전달할 콘텐츠:', content)
-
 
       // 2~3단계: 대본 생성 + 장면 구성
       const generated = await step(
@@ -236,16 +232,9 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           ),
         (result) => `핵심 포인트 ${result.summary.key_points.length}개`,
       )
-      console.log('대본 생성 결과:', JSON.stringify(generated))
-
-      // 왜 훅이 안나오는지 체크
-      console.log('AI 대본 생성 전체 응답:', generated)
-      console.log('AI 훅 문구:', generated.hook_text)
 
       dispatch({ type: 'summary', summary: generated.summary })
       dispatch({ type: 'hookText', hookText: generated.hook_text })
-
-      dispatch({ type: 'summary', summary: generated.summary })
 
       const scenes = await step(
         3,
@@ -256,13 +245,6 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       )
 
       dispatch({ type: 'scenes', scenes })
-      console.log('이미지 개수:', content.images.length)
-      console.log('첫 번째 이미지:', content.images[0])
-      console.log(
-        '본문 이미지 위치:',
-        content.text.match(/\[이미지 \d+\]/g),
-      )
-
 
       if (mode === 'review') {
         dispatch({ type: 'waitReview' })

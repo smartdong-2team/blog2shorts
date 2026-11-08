@@ -29,6 +29,13 @@ Motion = Literal[
     "pan_right",
 ]
 
+Voice = Literal[
+    "calm_female",
+    "bright_female",
+    "clear_male",
+    "low_male",
+]
+
 
 class VideoSettings(BaseModel):
     """영상 출력 설정: 해상도, FPS, 이미지 배치 방식."""
@@ -57,6 +64,10 @@ class VideoRenderRequest(BaseModel):
     scenes: list[RenderScene] = Field(min_length=1)
     output_path: Path
     settings: VideoSettings = Field(default_factory=VideoSettings)
+
+    # 배경음악. music_path가 없으면 내레이션만 사용한다
+    music_path: Path | None = None
+    music_gain: float = Field(default=0.0, ge=0, le=1)
 
     # 영상 상단 고정 훅 문구
     hook_text: str = Field(
@@ -129,7 +140,11 @@ class VideoCreateRequest(BaseModel):
         max_length=40,
         description="영상 상단에 고정 표시할 훅 문구",
     )
-    voice: None = None
+    # null이면 기본 목소리를 사용한다
+    voice: Voice | None = None
+    # 배경음악 곡 ID. "none"이면 배경음악 없음
+    music: str = "none"
+    music_volume: int = Field(default=30, ge=0, le=100)
 
     @model_validator(mode="after")
     def validate_scenes(self):

@@ -37,6 +37,7 @@ SUBTITLE_CENTER_Y = 1270
 
 SCENE_TIMEOUT_SEC = 60
 CONCAT_TIMEOUT_SEC = 120
+MUSIC_TIMEOUT_SEC = 120
 
 # FFmpeg 오류 로그에 남길 마지막 글자 수
 STDERR_TAIL_CHARS = 2000
@@ -512,6 +513,47 @@ async def render_scene(
         raise
 
 
+# 배경음악 믹싱
+async def mix_background_music(
+    video_path: Path,
+    music_path: Path,
+    gain: float,
+    duration_sec: float,
+    output_path: Path,
+) -> None:
+    """내레이션 아래에 배경음악을 반복해 깔고 끝에서 줄인다."""
+
+    fade_start = max(0.0, duration_sec - 1.0)
+
+    filter_complex = (
+        f"[1:a]volume={gain},"
+        f"afade=t=out:st={fade_start:.3f}:d=1[music];"
+        "[0:a][music]amix=inputs=2:duration=first:normalize=0,"
+        "alimiter=limit=0.95:level=false[audio]"
+    )
+
+    await run_ffmpeg(
+        [
+            FFMPEG_BIN,
+            "-y",
+            "-i", str(video_path),
+            "-stream_loop", "-1",
+            "-i", str(music_path),
+            "-filter_complex", filter_complex,
+            "-map", "0:v",
+            "-map", "[audio]",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-t", f"{duration_sec:.3f}",
+            "-movflags", "+faststart",
+            str(output_path),
+        ],
+        timeout_sec=MUSIC_TIMEOUT_SEC,
+        failure_message="FFmpeg 배경음악 합성 실패",
+    )
+
+
 # 씬을 연결해 하나의 MP4로 합성
 async def render_video(
     request: VideoRenderRequest,
@@ -559,6 +601,13 @@ async def render_video(
             encoding="utf-8",
         )
 
+        # 배경음악이 있으면 연결한 영상을 한 번 더 가공한다
+        concat_output = (
+            temp_path / "concat.mp4"
+            if request.music_path
+            else output_path
+        )
+
         try:
             # 3. 장면 영상 연결
             await run_ffmpeg(
@@ -570,11 +619,21 @@ async def render_video(
                     "-i", str(concat_file),
                     "-c", "copy",
                     "-movflags", "+faststart",
-                    str(output_path),
+                    str(concat_output),
                 ],
                 timeout_sec=CONCAT_TIMEOUT_SEC,
                 failure_message="FFmpeg 장면 연결 실패",
             )
+
+            # 4. 배경음악 믹싱
+            if request.music_path:
+                await mix_background_music(
+                    video_path=concat_output,
+                    music_path=request.music_path,
+                    gain=request.music_gain,
+                    duration_sec=duration_sec,
+                    output_path=output_path,
+                )
 
             if not output_path.is_file():
                 raise VideoRenderingError(

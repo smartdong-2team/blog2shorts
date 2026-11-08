@@ -4,7 +4,8 @@ import { Select } from '../../components/common/Select'
 import { Stack } from '../../components/common/Stack'
 import { Text } from '../../components/common/Text'
 import type { AudioSettings } from '../pipeline/types'
-import { MUSIC_OPTIONS, VOICE_OPTIONS } from './options'
+import { NO_MUSIC, VOICE_OPTIONS } from './options'
+import { useMusicOptions } from './useMusicOptions'
 
 interface VoiceMusicPickerProps {
   audio: AudioSettings
@@ -14,7 +15,10 @@ interface VoiceMusicPickerProps {
 
 /** 4단계 설정: 나레이션 목소리, 배경음악, 음악 크기 */
 export function VoiceMusicPicker({ audio, onChange, locked }: VoiceMusicPickerProps) {
-  const noMusic = audio.music === 'none'
+  const musicOptions = useMusicOptions()
+  const noMusic = audio.music === NO_MUSIC
+  const noTracks = musicOptions.length <= 1
+
   return (
     <Stack gap={10}>
       <Stack gap={4}>
@@ -22,7 +26,9 @@ export function VoiceMusicPicker({ audio, onChange, locked }: VoiceMusicPickerPr
           음성과 음악
         </Text>
         <Text variant="caption" tone="muted">
-          4단계에서 이 목소리로 나레이션을 읽고, 배경음악을 깔아 줍니다.
+          {noTracks
+            ? '이 목소리로 나레이션을 읽습니다. 등록된 배경음악 파일이 없어 음악은 선택할 수 없습니다.'
+            : '4단계에서 이 목소리로 나레이션을 읽고, 배경음악을 깔아 줍니다.'}
         </Text>
       </Stack>
       <Grid columns={3} compactColumns={1} gap={14}>
@@ -35,10 +41,10 @@ export function VoiceMusicPicker({ audio, onChange, locked }: VoiceMusicPickerPr
         />
         <Select
           label="배경음악"
-          options={MUSIC_OPTIONS}
+          options={musicOptions}
           value={audio.music}
           onChange={(event) => onChange({ music: event.target.value })}
-          disabled={locked}
+          disabled={locked || noTracks}
         />
         <Range
           label="음악 크기"

@@ -7,6 +7,17 @@ from app.core.config import get_settings
 from app.core.openai import get_openai_client
 from app.schemas.audio import AudioAsset
 
+# 화면의 목소리 선택값 → OpenAI TTS 음성
+OPENAI_VOICES = {
+    "calm_female": "shimmer",
+    "bright_female": "nova",
+    "clear_male": "echo",
+    "low_male": "onyx",
+}
+
+DEFAULT_VOICE = "calm_female"
+
+
 class TTSGenerationError(Exception):
     """음성 생성에 실패했을 때 발생하는 오류."""
 

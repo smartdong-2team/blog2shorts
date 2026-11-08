@@ -812,6 +812,57 @@ def test_subtitle_filter_accepts_special_characters(text):
 
 
 # ==========================================================
+# 11. 배경음악
+# ==========================================================
+
+@pytest.mark.asyncio
+async def test_render_video_mixes_music_after_concat(tmp_path):
+    """배경음악이 있으면 연결한 영상에 음악을 입혀 최종 파일을 만든다."""
+
+    music_path = tmp_path / "music.mp3"
+    music_path.write_bytes(b"fake music")
+
+    request = VideoRenderRequest(
+        scenes=[make_scene(tmp_path)],
+        output_path=tmp_path / "final.mp4",
+        music_path=music_path,
+        music_gain=0.12,
+    )
+
+    async def fake_render_scene(**kwargs):
+        kwargs["output_path"].write_bytes(b"fake scene mp4")
+        return kwargs["output_path"]
+
+    commands = []
+
+    async def mock_exec(*command, **kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"fake mp4")
+        return make_mock_process()
+
+    with (
+        patch(
+            "app.services.video_render.render_scene",
+            side_effect=fake_render_scene,
+        ),
+        patch(
+            "app.services.video_render.asyncio.create_subprocess_exec",
+            side_effect=mock_exec,
+        ),
+    ):
+        await render_video(request)
+
+    concat_command, mix_command = commands
+
+    assert "concat" in concat_command
+    assert concat_command[-1] != str(request.output_path.resolve())
+
+    assert str(music_path) in mix_command
+    assert "volume=0.12" in " ".join(mix_command)
+    assert mix_command[-1] == str(request.output_path.resolve())
+
+
+# ==========================================================
 # 12. 중지 시 FFmpeg 종료
 # ==========================================================
 

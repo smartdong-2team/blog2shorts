@@ -14,7 +14,9 @@ export const MUSIC_OPTIONS = [
   { value: 'dreamy_synth', label: '몽환적인 신스' },
 ]
 
-export const DEFAULT_AUDIO: AudioSettings = { voice: 'calm_female', music: 'soft_piano', music_volume: 30 }
+export const NO_MUSIC = 'none'
+
+export const DEFAULT_AUDIO: AudioSettings = { voice: 'calm_female', music: NO_MUSIC, music_volume: 30 }
 
 const labelOf = (options: { value: string; label: string }[], value: string) =>
   options.find((o) => o.value === value)?.label ?? value

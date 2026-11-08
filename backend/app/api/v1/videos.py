@@ -11,6 +11,7 @@ from fastapi import Response
 from app.core.config import get_settings
 from app.core.errors import classify_error
 from app.schemas.video import VideoCreateRequest
+from app.services.music import NO_MUSIC, find_track
 from app.services.video_pipeline import generate_video
 from app.services.storage import get_asset
 
@@ -104,24 +105,34 @@ async def create_video(
                 },
             )
 
-    # 2. 작업 ID 생성
+    # 2. 배경음악 파일 존재 여부 검증
+    if request.music != NO_MUSIC and find_track(request.music) is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "NOT_FOUND",
+                "message": "배경음악 파일을 찾을 수 없습니다.",
+            },
+        )
+
+    # 3. 작업 ID 생성
     job_id = str(uuid4())
 
-    # 3. 작업 상태 저장
+    # 4. 작업 상태 저장
     video_jobs[job_id] = {
         "status": "queued",
         "output_path": None,
         "error": None,
     }
 
-    # 4. 백그라운드 작업 등록
+    # 5. 백그라운드 작업 등록
     background_tasks.add_task(
         run_video_job,
         job_id,
         request,
     )
 
-    # 5. 즉시 202 응답
+    # 6. 즉시 202 응답
     return VideoCreateResponse(
         job_id=job_id,
         status="queued",
