@@ -1,23 +1,28 @@
 .tabs {
   display: flex;
-  gap: var(--space-6);
+  gap: var(--space-18);
 }
 
 .tab {
-  padding: var(--space-10) var(--space-18);
+  padding: var(--space-6) 0;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-bottom: 2px solid transparent;
   font: inherit;
   font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--color-text-muted);
-  background: var(--color-subtle);
+  background: transparent;
   cursor: pointer;
 }
 
-.selected {
-  color: var(--color-surface);
-  background: var(--color-text);
+.tab:hover {
+  color: var(--color-text-soft);
+}
+
+.selected,
+.selected:hover {
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
 }
 
 .tab:focus-visible {
