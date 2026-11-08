@@ -49,9 +49,11 @@
   align-items: center;
   gap: 5px;
   margin-left: auto;
-  padding: 2px 8px;
+  /* 한글 글꼴이 줄 상자 위쪽에 붙어 그려져서 위 여백을 1px 더 줘 가운데로 맞춘다 */
+  padding: 4px 8px 3px;
   border-radius: 999px;
   font-size: 11px;
+  line-height: 1;
   font-weight: 700;
   color: var(--color-text-soft);
   background: var(--color-subtle);
