@@ -1,0 +1,27 @@
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.head > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding-top: var(--space-14);
+  border-top: 1px solid var(--color-line);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-heading);
+  font-weight: 700;
+}
