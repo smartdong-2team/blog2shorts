@@ -63,6 +63,8 @@
   flex: none;
   width: 10px;
   height: 10px;
+  /* 배지 위 여백을 글자 맞춤용으로 1px 더 줬으니 아이콘은 1px 올려 배지 가운데에 둔다 */
+  margin-top: -1px;
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
