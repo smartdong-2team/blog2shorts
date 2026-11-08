@@ -3,9 +3,9 @@ import asyncio
 import wave
 from pathlib import Path
 from uuid import uuid4
+from app.core.config import get_settings
 from app.core.openai import get_openai_client
 from app.schemas.audio import AudioAsset
-
 
 class TTSGenerationError(Exception):
     """음성 생성에 실패했을 때 발생하는 오류."""
@@ -30,7 +30,7 @@ async def generate_speech(
 
     try:
         async with client.audio.speech.with_streaming_response.create(
-            model="tts-1",
+            model=get_settings().openai_tts_model,
             voice=voice,
             input=narration,
             response_format="wav",
