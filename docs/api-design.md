@@ -153,6 +153,7 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 | 역할 | 첫 장면 `hook`, 마지막 장면 `cta`, 사이는 모두 `body`(2~4개) |
 | `narration` | 장면당 1~120자, 전체 약 150~350자 |
 | `caption` | 장면당 1~30자 (화면 표시용 요약) |
+| `subtitle_pages` | 내레이션을 나눈 영상 자막. `[["1줄", "2줄"], ["다음 자막"]]` 형식이고 자막마다 1~2줄. 항상 값이 있다 (AI 결과의 품질이 낮으면 서버 규칙으로 나눈다) |
 | `asset_id` | 요청 `images`에 있는 값 또는 `null`(대체 배경) |
 | `estimated_duration_sec` | 서버가 글자 수 기반으로 계산(AI 값 미사용) |
 
@@ -166,7 +167,7 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 ```json
 {
   "scenes": [
-    { "order": 1, "role": "hook", "narration": "…", "caption": "…", "asset_id": "5b8e…" }
+    { "order": 1, "role": "hook", "narration": "…", "caption": "…", "asset_id": "5b8e…", "subtitle_pages": [["1줄", "2줄"], ["다음 자막"]] }
   ],
   "hook_text": "…",
   "voice": "calm_female",
@@ -175,7 +176,7 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 }
 ```
 
-검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 `calm_female` | `bright_female` | `clear_male` | `low_male` 또는 `null`(기본 목소리)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이다.
+검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 `calm_female` | `bright_female` | `clear_male` | `low_male` 또는 `null`(기본 목소리)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이다. `subtitle_pages`는 생략할 수 있고, 내레이션과 글자가 맞으면 그대로 영상 자막으로 쓴다 (맞지 않으면 서버가 규칙으로 다시 나눈다).
 
 - Response `202`
 
