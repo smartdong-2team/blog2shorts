@@ -12,21 +12,30 @@ from app.services.subtitle_styles import SUBTITLE_STYLES
 SUBTITLE_MAX_WIDTH = 960
 SUBTITLE_MAX_LINES = 2
 LINE_BREAK_WEIGHT = 110
+# 의미 등급 하나와 맞바꿀 수 있는 두 줄의 폭 차이(px)
+LINE_GRADE_PX = 200
+# 이 정도까지의 폭 차이는 뜻을 살리기 위해 허용한다(px)
+LINE_BALANCE_ALLOWANCE_PX = 400
 
 SENTENCE_END = re.compile(r"[.!?。！？…][\"'”’)]*$")
 
 # 뒤 단어가 앞말에 의존해서 떼어 놓으면 어색한 경우
 DEPENDENT_AFTER = re.compile(
-    r"^(수|뒤|때|것|것이|것을|게|걸|건|거|줄|있어요|있죠|없어요|보세요|해요|돼요|드려요)[.!?,]?$"
+    r"^(수|뒤|때|것|것이|것을|게|걸|건|거|줄|보세요|해요|돼요|드려요"
+    # '6회가 있으며'처럼 주어와 떨어지면 안 되는 서술어
+    r"|(있|없)(어요|죠|으며|고|는데|으면|지만|어서|으니|습니다))[.!?,]?$"
 )
 # 뒤 명사를 꾸며서 이어져야 하는 말
 MODIFIER_BEFORE = re.compile(
     r"(하는|되는|있는|없는|위한|대한|통한|같은|익힌|확인한|작성한|배운)$"
 )
 DETERMINER = re.compile(
-    r"^(각|이|그|저|몇|여러|새|어떤|주요|핵심|최신|다양한|필요한|중요한|이런|그런|모든)$"
+    r"^(각|이|그|저|몇|여러|새|어떤|및|주요|핵심|최신|다양한|필요한|중요한|이런|그런|모든)$"
 )
 LINKED_ENDINGS = re.compile(r"[,，:：]$|(하면|하지만|다면|으며|면서|하고|고|니|서)$")
+# 나열이 끝나는 말. 이 뒤는 끊기 좋다
+LIST_END = {"등", "등을", "등이", "등의", "등도", "등은"}
+COMMA_END = re.compile(r"[,，]$")
 
 
 # --------------------------------------------------
@@ -123,8 +132,25 @@ def _split_long_word(word: str) -> list[str]:
     return pieces
 
 
-def _page_break_cost(before: str, after: str) -> int:
-    """두 단어 사이에서 자막 페이지를 넘길 때의 비용. 낮을수록 좋다."""
+def _is_list_comma(words: list[str], index: int) -> bool:
+    """"책, 잡지, 브로슈어 등"처럼 나열 안에 있는 쉼표인지 확인한다."""
+
+    if not COMMA_END.search(words[index]):
+        return False
+
+    previous_has_comma = index > 0 and COMMA_END.search(words[index - 1])
+    next_has_comma = index + 1 < len(words) and COMMA_END.search(words[index + 1])
+    # 'A, B C 등'처럼 쉼표 뒤 몇 단어 안에 나열이 끝나는 경우
+    list_ends_soon = any(word in LIST_END for word in words[index + 2:index + 4])
+
+    return bool(previous_has_comma or next_has_comma or list_ends_soon)
+
+
+def _page_break_cost(words: list[str], index: int) -> int:
+    """words[index] 뒤에서 자막 페이지를 넘길 때의 비용. 낮을수록 좋다."""
+
+    before = words[index]
+    after = words[index + 1]
 
     if SENTENCE_END.search(before):
         return 0
@@ -135,20 +161,30 @@ def _page_break_cost(before: str, after: str) -> int:
     if MODIFIER_BEFORE.search(before):
         return 55
 
-    if DETERMINER.match(before) or before.endswith("의"):
+    if (
+        DETERMINER.match(before)
+        or before.endswith("의")
+        or _is_list_comma(words, index)
+    ):
         return 45
+
+    if LINKED_ENDINGS.search(before):
+        return -20
 
     if re.search(r"(은|는|이|가|을|를)$", before):
         return -14
 
-    if LINKED_ENDINGS.search(before):
+    if before in LIST_END:
         return -6
 
     return 12
 
 
-def _line_break_cost(before: str, after: str) -> int:
-    """페이지 안에서 줄을 나눌 때의 등급. 낮을수록 좋다."""
+def _line_break_cost(words: list[str], index: int) -> int:
+    """words[index] 뒤에서 줄을 나눌 때의 등급. 낮을수록 좋다."""
+
+    before = words[index]
+    after = words[index + 1]
 
     if (
         DEPENDENT_AFTER.match(after)
@@ -158,9 +194,14 @@ def _line_break_cost(before: str, after: str) -> int:
     ):
         return 3
 
-    if LINKED_ENDINGS.search(before) or re.search(
-        r"(은|는|이|가|을|를|와|과|도|에|로)$",
-        before,
+    # 나열은 중간에서 끊지 않는다
+    if _is_list_comma(words, index):
+        return 2
+
+    if (
+        before in LIST_END
+        or LINKED_ENDINGS.search(before)
+        or re.search(r"(은|는|이|가|을|를|와|과|도|에|로)$", before)
     ):
         return 0
 
@@ -187,10 +228,12 @@ def _layout_page(words: list[str]) -> list[str] | None:
         if max(first_width, second_width) > SUBTITLE_MAX_WIDTH:
             continue
 
-        # 의미가 우선이고, 같은 등급이면 두 줄의 길이가 비슷한 쪽을 고른다
+        # 의미가 우선이지만, 두 줄 길이 차이가 너무 크면 다음 후보를 고른다
+        gap = abs(first_width - second_width)
         score = (
-            _line_break_cost(words[index - 1], words[index]),
-            abs(first_width - second_width),
+            _line_break_cost(words, index - 1) * LINE_GRADE_PX
+            + max(0.0, gap - LINE_BALANCE_ALLOWANCE_PX),
+            gap,
         )
 
         if best_score is None or score < best_score:
@@ -230,13 +273,13 @@ def _split_sentence(words: list[str]) -> list[list[str]]:
             # 한두 단어만 남는 페이지는 어색하다
             orphan = 65 if len(part) == 1 else 22 if len(part) == 2 else 0
             boundary = (
-                _page_break_cost(words[end - 1], words[end])
+                _page_break_cost(words, end - 1)
                 if end < len(words)
                 else 0
             )
             # 어중간한 줄바꿈보다는 페이지를 하나 더 쓰는 편이 읽기 좋다
             line_break = (
-                _line_break_cost(lines[0].split()[-1], lines[1].split()[0])
+                _line_break_cost(part, len(lines[0].split()) - 1)
                 * LINE_BREAK_WEIGHT
                 if len(lines) == 2
                 else 0

@@ -277,3 +277,44 @@ def test_create_narration_cues_gives_longer_page_more_time():
 def test_create_narration_cues_rejects_empty_text():
     with pytest.raises(ValueError):
         create_narration_cues("   ", 3.0)
+
+
+# 나열과 서술어
+def test_split_into_pages_keeps_list_together():
+    """나열은 중간에서 끊지 않고, 나열이 끝난 뒤에서 줄을 나눈다."""
+
+    pages = split_into_pages(
+        "인디자인은 책, 잡지, 브로슈어 등 다양한 편집디자인에 쓰이는 "
+        "아주 중요한 프로그램이에요."
+    )
+
+    assert pages[0] == [
+        "인디자인은 책, 잡지, 브로슈어 등",
+        "다양한 편집디자인에 쓰이는",
+    ]
+
+
+def test_split_into_pages_prefers_comma_between_clauses():
+    """나열이 아닌 쉼표는 여전히 좋은 줄바꿈 위치다."""
+
+    pages = split_into_pages(
+        "자동차정비기능사 필기시험, 혼자 준비할 수 있을지 고민되시죠?"
+    )
+
+    assert pages == [
+        ["자동차정비기능사 필기시험,", "혼자 준비할 수 있을지 고민되시죠?"],
+    ]
+
+
+def test_split_into_pages_keeps_subject_with_predicate():
+    """'6회가 있으며'처럼 주어와 서술어는 떼지 않고 쉼표 뒤에서 나눈다."""
+
+    pages = split_into_pages(
+        "2026년 전산세무 2급 시험은 총 6회가 있으며, "
+        "마지막 시험은 12월 5일에 치러져요."
+    )
+
+    assert pages == [
+        ["2026년 전산세무 2급 시험은", "총 6회가 있으며,"],
+        ["마지막 시험은 12월 5일에 치러져요."],
+    ]
