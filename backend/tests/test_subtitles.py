@@ -3,8 +3,12 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.audio import SubtitleCue
+from app.services.subtitle_styles import SUBTITLE_STYLES
 from app.services.subtitles import (
+    HOOK_MAX_FONT_SIZE,
+    HOOK_MAX_WIDTH,
     SUBTITLE_MAX_WIDTH,
+    layout_hook,
     clean_subtitle_pages,
     create_narration_cues,
     split_into_pages,
@@ -412,6 +416,54 @@ def test_create_narration_cues_respects_user_edited_pages():
         "먼저 구조를 이해하는",
         "게 좋아요.",
     ]
+
+
+# --------------------------------------------------
+# 상단 제목 배치
+# --------------------------------------------------
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2026년 전산세무 2급 시험,\n놓치면 안 될 일정 알려줘요!",
+        "2026년 전산세무 2급 시험, 놓치면 안 될 일정 알려줘요!",
+        "첫째 줄\n둘째 줄\n셋째 줄",
+        "짧은 제목",
+    ],
+)
+def test_layout_hook_fits_two_lines(text):
+    lines, fontsize = layout_hook(text)
+
+    assert 1 <= len(lines) <= 2
+    assert all(
+        text_width(line) / SUBTITLE_STYLES["default"]["font_size"] * fontsize
+        <= HOOK_MAX_WIDTH
+        for line in lines
+    )
+
+
+def test_layout_hook_keeps_manual_line_break():
+    lines, _ = layout_hook("앞줄이 아주 짧고\n뒷줄")
+
+    assert lines == ["앞줄이 아주 짧고", "뒷줄"]
+
+
+def test_layout_hook_merges_extra_lines_without_losing_words():
+    lines, _ = layout_hook("첫째 줄\n둘째 줄\n셋째 줄")
+
+    assert lines == ["첫째 줄", "둘째 줄 셋째 줄"]
+
+
+def test_layout_hook_shrinks_long_line():
+    long_line = "아주 긴 제목이 한 단어처럼붙어서길게이어지는경우에도들어가야해요"
+
+    lines, fontsize = layout_hook(f"짧은 줄\n{long_line}")
+
+    assert lines[1] == long_line
+    assert fontsize < HOOK_MAX_FONT_SIZE
+
+
+def test_layout_hook_empty():
+    assert layout_hook("  \n ")[0] == []
 
 
 # --------------------------------------------------

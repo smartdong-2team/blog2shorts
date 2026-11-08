@@ -2,13 +2,12 @@
 import asyncio
 import logging
 import tempfile
-import textwrap
 from pathlib import Path
 import os
 
 
 from app.services.subtitle_styles import SUBTITLE_STYLES
-from app.services.subtitles import SUBTITLE_MAX_WIDTH, text_width
+from app.services.subtitles import SUBTITLE_MAX_WIDTH, layout_hook, text_width
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
 from app.schemas.video import (
@@ -268,31 +267,10 @@ def build_hook_filter(hook_text: str) -> str:
             f"훅 폰트 파일을 찾을 수 없습니다: {font_file}"
         )
 
-    # 사용자가 입력한 줄바꿈 유지
-    lines = [
-        line.strip()
-        for line in hook_text.splitlines()
-        if line.strip()
-    ]
+    lines, fontsize = layout_hook(hook_text)
 
-    # 줄바꿈이 없는 긴 문장만 자동 분할
-    if len(lines) == 1 and len(lines[0]) > 16:
-        lines = textwrap.wrap(
-            lines[0],
-            width=16,
-            break_long_words=False,
-            break_on_hyphens=False,
-        )
-
-    # 가장 긴 줄을 기준으로 글자 크기 조절
-    max_length = max(len(line) for line in lines)
-
-    if max_length > 20:
-        fontsize = 58
-    elif max_length > 16:
-        fontsize = 68
-    else:
-        fontsize = 80
+    if not lines:
+        return ""
 
     line_height = int(fontsize * 1.3)
 

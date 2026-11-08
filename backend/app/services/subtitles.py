@@ -19,6 +19,11 @@ LINE_BALANCE_ALLOWANCE_PX = 400
 # AI가 나눈 두 줄의 폭 차이가 이보다 크면 다시 나눈다(px)
 MAX_LINE_WIDTH_GAP_PX = 560
 
+# 상단 제목 (항상 두 줄 이내)
+HOOK_MAX_WIDTH = 1000
+HOOK_MAX_FONT_SIZE = 80
+HOOK_MIN_FONT_SIZE = 44
+
 SENTENCE_END = re.compile(r"[.!?。！？…][\"'”’)]*$")
 
 # 뒤 단어가 앞말에 의존해서 떼어 놓으면 어색한 경우
@@ -327,6 +332,54 @@ def split_into_pages(text: str) -> list[list[str]]:
         pages.extend(_split_sentence(sentence))
 
     return pages
+
+
+def layout_hook(text: str) -> tuple[list[str], int]:
+    """제목을 최대 두 줄로 나누고, 폭에 맞는 글자 크기를 정한다.
+
+    직접 넣은 줄바꿈은 지키고(세 줄 이상이면 둘째 줄로 합침), 없으면 균형 있게 나눈다.
+    """
+
+    rows = [row.strip() for row in text.splitlines() if row.strip()]
+
+    if not rows:
+        return [], HOOK_MAX_FONT_SIZE
+
+    if len(rows) > 1:
+        lines = [rows[0], " ".join(rows[1:])]
+    else:
+        lines = _balance_hook_line(rows[0])
+
+    # 자막 글꼴 크기로 잰 폭을 제목 크기로 환산한다
+    base_size = SUBTITLE_STYLES["default"]["font_size"]
+    widest_at_one = max(text_width(line) for line in lines) / base_size
+    fontsize = int(HOOK_MAX_WIDTH / widest_at_one)
+
+    return lines, max(HOOK_MIN_FONT_SIZE, min(HOOK_MAX_FONT_SIZE, fontsize))
+
+
+def _balance_hook_line(text: str) -> list[str]:
+    """한 줄 제목을 두 줄 폭이 가장 비슷해지도록 나눈다."""
+
+    words = text.split()
+    single_width = text_width(text)
+    base_size = SUBTITLE_STYLES["default"]["font_size"]
+
+    # 가장 큰 글자로도 한 줄에 들어가면 나누지 않는다
+    if len(words) == 1 or single_width / base_size * HOOK_MAX_FONT_SIZE <= HOOK_MAX_WIDTH:
+        return [text]
+
+    candidates = (
+        (" ".join(words[:i]), " ".join(words[i:]))
+        for i in range(1, len(words))
+    )
+
+    return list(
+        min(
+            candidates,
+            key=lambda pair: abs(text_width(pair[0]) - text_width(pair[1])),
+        )
+    )
 
 
 def _compare_key(text: str) -> str:

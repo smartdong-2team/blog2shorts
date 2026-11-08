@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { layoutHook, subtitleFontSize } from './hookLayout'
 import styles from './SceneThumb.module.css'
 import type { Motion } from '../../../features/pipeline/types'
 
@@ -29,6 +30,7 @@ export function SceneThumb({
   motion,
 }: SceneThumbProps) {
   const [playCount, setPlayCount] = useState(0)
+  const hook = layoutHook(hookText)
 
   return (
     <div className={styles.thumb}>
@@ -39,8 +41,10 @@ export function SceneThumb({
         disabled={!src}
         aria-label="장면 움직임 다시 재생"
       >
-        {hookText && (
-          <span className={styles.hookText}>{hookText}</span>
+        {hook.text && (
+          <span className={styles.hookText} style={{ fontSize: hook.fontSize }}>
+            {hook.text}
+          </span>
         )}
 
         <div className={styles.imageArea}>
@@ -59,7 +63,9 @@ export function SceneThumb({
         </div>
 
         {subtitle && (
-          <span className={styles.subtitle}>{subtitle}</span>
+          <span className={styles.subtitle} style={{ fontSize: subtitleFontSize(subtitle) }}>
+            {subtitle}
+          </span>
         )}
       </button>
 
