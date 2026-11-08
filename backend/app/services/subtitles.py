@@ -18,6 +18,14 @@ LINE_GRADE_PX = 200
 LINE_BALANCE_ALLOWANCE_PX = 400
 # AI가 나눈 두 줄의 폭 차이가 이보다 크면 다시 나눈다(px)
 MAX_LINE_WIDTH_GAP_PX = 560
+# 두 줄 자막의 권장 글자 수 (공백·문장 부호 제외)
+MIN_FIRST_LINE_CHARS = 10
+SHORT_SECOND_LINE_CHARS = 6
+# 권장 글자 수를 벗어날 때의 비용. 뜻이 더 나쁘게 끊기면 권장을 어길 수 있다
+# 둘째 줄이 짧은 것이 더 어색하므로, 그때는 첫 줄이 좀 짧아져도 앞말을 내린다
+SHORT_FIRST_LINE_PX = 150
+SHORT_SECOND_LINE_PX = 500
+SHORT_SECOND_LINE_PAGE_COST = 120
 
 # 상단 제목 (항상 두 줄 이내)
 HOOK_MAX_WIDTH = 1000
@@ -29,6 +37,8 @@ SENTENCE_END = re.compile(r"[.!?。！？…][\"'”’)]*$")
 # 뒤 단어가 앞말에 의존해서 떼어 놓으면 어색한 경우
 DEPENDENT_AFTER = re.compile(
     r"^(수|뒤|때|것|것이|것을|게|걸|건|거|줄|보세요|해요|돼요|드려요"
+    # '가르쳐 주니', '준비해야 할지'처럼 앞말에 이어지는 말
+    r"|주니|주면|주고|줘요|주세요|드릴게요|할지|할까요"
     # '6회가 있으며'처럼 주어와 떨어지면 안 되는 서술어
     r"|(있|없)(어요|죠|으며|고|는데|으면|지만|어서|으니|습니다))[.!?,]?$"
 )
@@ -39,7 +49,7 @@ MODIFIER_BEFORE = re.compile(
 DETERMINER = re.compile(
     r"^(각|이|그|저|몇|여러|새|어떤|및|주요|핵심|최신|다양한|필요한|중요한|이런|그런|모든)$"
 )
-LINKED_ENDINGS = re.compile(r"[,，:：]$|(하면|하지만|다면|으며|면서|하고|고|니|서)$")
+LINKED_ENDINGS = re.compile(r"[,，:：]$|(면|하지만|으며|면서|하고|고|니|서)$")
 # 나열이 끝나는 말. 이 뒤는 끊기 좋다
 LIST_END = {"등", "등을", "등이", "등의", "등도", "등은"}
 COMMA_END = re.compile(r"[,，]$")
@@ -215,6 +225,20 @@ def _line_break_cost(words: list[str], index: int) -> int:
     return 1
 
 
+def _short_line_penalty(first: str, second: str) -> int:
+    """두 줄이 권장 글자 수보다 짧을 때의 비용(px)."""
+
+    penalty = 0
+
+    if len(_compare_key(first)) < MIN_FIRST_LINE_CHARS:
+        penalty += SHORT_FIRST_LINE_PX
+
+    if _is_short_second_line(second):
+        penalty += SHORT_SECOND_LINE_PX
+
+    return penalty
+
+
 def _layout_page(words: list[str]) -> list[str] | None:
     """단어들을 1~2줄로 배치한다. 들어가지 않으면 None."""
 
@@ -239,6 +263,7 @@ def _layout_page(words: list[str]) -> list[str] | None:
         gap = abs(first_width - second_width)
         score = (
             _line_break_cost(words, index - 1) * LINE_GRADE_PX
+            + _short_line_penalty(first, second)
             + max(0.0, gap - LINE_BALANCE_ALLOWANCE_PX),
             gap,
         )
@@ -288,6 +313,11 @@ def _split_sentence(words: list[str]) -> list[list[str]]:
             line_break = (
                 _line_break_cost(part, len(lines[0].split()) - 1)
                 * LINE_BREAK_WEIGHT
+                + (
+                    SHORT_SECOND_LINE_PAGE_COST
+                    if _is_short_second_line(lines[1])
+                    else 0
+                )
                 if len(lines) == 2
                 else 0
             )
@@ -446,10 +476,10 @@ def clean_subtitle_pages(
     return cleaned
 
 
-def _is_short_predicate(line: str) -> bool:
-    """"많아요."처럼 짧은 한 단어만 남은 줄인지 확인한다."""
+def _is_short_second_line(line: str) -> bool:
+    """"좋아요."처럼 둘째 줄에 짧은 말만 남았는지 확인한다."""
 
-    return " " not in line and len(_compare_key(line)) <= 3
+    return len(_compare_key(line)) <= SHORT_SECOND_LINE_CHARS
 
 
 def _has_awkward_break(pages: list[list[str]]) -> bool:
@@ -466,7 +496,7 @@ def _has_awkward_break(pages: list[list[str]]) -> bool:
     for page_index, lines in enumerate(pages):
         page_words = " ".join(lines).split()
 
-        # 한 자막에 두 문장을 섞지 않는다
+        # 한 자막에 두 문장을 섞지 않는다 (같은 줄 안의 짧은 문장도 포함)
         if any(SENTENCE_END.search(word) for word in page_words[:-1]):
             return True
 
@@ -477,7 +507,7 @@ def _has_awkward_break(pages: list[list[str]]) -> bool:
             if _line_break_cost(all_words, first_end) >= 2:
                 return True
 
-            if _is_short_predicate(lines[1]):
+            if _is_short_second_line(lines[1]):
                 return True
 
             gap = abs(text_width(lines[0]) - text_width(lines[1]))

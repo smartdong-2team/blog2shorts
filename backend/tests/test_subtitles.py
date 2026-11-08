@@ -539,3 +539,55 @@ def test_clean_subtitle_pages_rejects_split_predicate(pages):
         pages,
         "2026년 전산세무 2급 시험은 총 6회가 있으며, 마지막 시험은 12월 5일에 치러져요.",
     ) is None
+
+
+# --------------------------------------------------
+# 줄 글자 수 권장 규칙
+# --------------------------------------------------
+@pytest.mark.parametrize(
+    "narration,expected",
+    [
+        # 둘째 줄이 짧으면 앞줄의 의미 단위를 아래로 내린다
+        (
+            "이해 어려우면 온라인 강의를 활용해보세요.",
+            [["이해 어려우면", "온라인 강의를 활용해보세요."]],
+        ),
+        # 첫 줄 권장 때문에 멀쩡한 자막을 둘로 쪼개지 않는다
+        (
+            "시험은 어렵지 않으며, 합격선은 60점이에요.",
+            [["시험은 어렵지 않으며,", "합격선은 60점이에요."]],
+        ),
+        # 보조 용언과 의존 표현은 앞말과 같은 줄에 둔다
+        (
+            "기초부터 실전까지 체계적으로 가르쳐 주니 초보자도 쉽게 따라갈 수 있어요.",
+            [
+                ["기초부터 실전까지 체계적으로"],
+                ["가르쳐 주니 초보자도", "쉽게 따라갈 수 있어요."],
+            ],
+        ),
+    ],
+)
+def test_split_into_pages_line_length_recommendation(narration, expected):
+    assert split_into_pages(narration) == expected
+
+
+@pytest.mark.parametrize(
+    "narration",
+    [
+        "기출문제로 시험 유형 익히고, 틀린 문제는 이론 복습하세요. 이해 어려우면 온라인 강의를 활용해보세요.",
+        "기초부터 실전까지 체계적으로 가르쳐 주니 초보자도 쉽게 따라갈 수 있어요.",
+        "온라인 강의와 교재를 함께 활용하면 정말 좋아요.",
+    ],
+)
+def test_split_into_pages_avoids_short_second_line(narration):
+    for lines in split_into_pages(narration):
+        if len(lines) == 2:
+            assert len(lines[1].replace(" ", "").rstrip(".!?")) > 6
+
+
+def test_clean_subtitle_pages_rejects_short_second_line():
+    assert clean_subtitle_pages(
+        [["이해 어려우면 온라인 강의를", "활용해보세요."]],
+        "이해 어려우면 온라인 강의를 활용해보세요.",
+    ) is None
+

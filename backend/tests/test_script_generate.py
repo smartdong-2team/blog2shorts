@@ -227,18 +227,21 @@ async def test_generate_script_fails_after_invalid_outputs():
 
 # 4. AI가 나눈 자막
 def test_normalize_subtitle_pages_keeps_valid_pages():
-    pages = [["먼저 구조를", "이해해 보세요."]]
+    pages = [["먼저 자동차 구조를", "차근차근 이해해 보세요."]]
 
-    assert normalize_subtitle_pages(pages, "먼저 구조를 이해해 보세요.") == pages
+    assert normalize_subtitle_pages(
+        pages,
+        "먼저 자동차 구조를 차근차근 이해해 보세요.",
+    ) == pages
 
 
 def test_normalize_subtitle_pages_applies_narration_style():
-    narration = normalize_narration_style("구조를 먼저 이해해야 합니다.")
+    narration = normalize_narration_style("자동차 구조를 먼저 차근차근 이해해야 합니다.")
 
     assert normalize_subtitle_pages(
-        [["구조를 먼저", "이해해야 합니다."]],
+        [["자동차 구조를 먼저", "차근차근 이해해야 합니다."]],
         narration,
-    ) == [["구조를 먼저", "이해해야 해요."]]
+    ) == [["자동차 구조를 먼저", "차근차근 이해해야 해요."]]
 
 
 def test_normalize_subtitle_pages_falls_back_to_rule_split():
