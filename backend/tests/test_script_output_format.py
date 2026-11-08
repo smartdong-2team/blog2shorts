@@ -25,6 +25,7 @@ def valid_output():
             "topic": "인디자인 독학",
             "key_points": ["기초 학습", "실습", "복습"],
         },
+        "hook_text": "인디자인 독학, 어디서부터?",
         "scenes": [
             {
                 "order": i + 1,

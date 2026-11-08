@@ -41,6 +41,7 @@ def make_response() -> ScriptGenerateResponse:
             "topic": "인디자인 독학",
             "key_points": ["기본 기능", "실습"],
         },
+        hook_text="인디자인 독학, 어디서부터?",
         scenes=[
             {
                 "order": i + 1,
