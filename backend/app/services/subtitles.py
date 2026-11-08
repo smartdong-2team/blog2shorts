@@ -16,6 +16,8 @@ LINE_BREAK_WEIGHT = 110
 LINE_GRADE_PX = 200
 # 이 정도까지의 폭 차이는 뜻을 살리기 위해 허용한다(px)
 LINE_BALANCE_ALLOWANCE_PX = 400
+# AI가 나눈 두 줄의 폭 차이가 이보다 크면 다시 나눈다(px)
+MAX_LINE_WIDTH_GAP_PX = 560
 
 SENTENCE_END = re.compile(r"[.!?。！？…][\"'”’)]*$")
 
@@ -327,17 +329,140 @@ def split_into_pages(text: str) -> list[list[str]]:
     return pages
 
 
+def _compare_key(text: str) -> str:
+    """문장 부호와 공백을 뺀 비교용 문자열."""
+
+    return re.sub(r"[\s.,!?…\"'’”]", "", text)
+
+
+def validate_subtitle_pages(
+    pages: list[list[str]] | None,
+    narration: str,
+) -> list[list[str]] | None:
+    """자막 페이지의 구조와 글자를 확인한다. 쓸 수 없으면 None을 돌려준다.
+
+    - 내레이션의 글자를 빠짐없이 같은 순서로 담아야 한다 (문장 부호·공백 제외)
+    - 페이지는 1~2줄이어야 한다
+    """
+
+    if not pages:
+        return None
+
+    cleaned: list[list[str]] = []
+
+    for page in pages:
+        lines = [line.strip() for line in page]
+
+        if not 1 <= len(lines) <= SUBTITLE_MAX_LINES or not all(lines):
+            return None
+
+        cleaned.append(lines)
+
+    joined = "".join(line for lines in cleaned for line in lines)
+
+    if _compare_key(joined) != _compare_key(narration):
+        return None
+
+    return cleaned
+
+
+def clean_subtitle_pages(
+    pages: list[list[str]] | None,
+    narration: str,
+) -> list[list[str]] | None:
+    """AI가 나눈 자막의 품질까지 검사한다. 쓸 수 없으면 None을 돌려준다.
+
+    사용자가 직접 고친 자막에는 쓰지 않는다. 편집 결과는 그대로 존중한다.
+    """
+
+    cleaned = validate_subtitle_pages(pages, narration)
+
+    if cleaned is None:
+        return None
+
+    if any(
+        text_width(line) > SUBTITLE_MAX_WIDTH
+        for lines in cleaned
+        for line in lines
+    ):
+        return None
+
+    if _has_awkward_break(cleaned):
+        return None
+
+    return cleaned
+
+
+def _is_short_predicate(line: str) -> bool:
+    """"많아요."처럼 짧은 한 단어만 남은 줄인지 확인한다."""
+
+    return " " not in line and len(_compare_key(line)) <= 3
+
+
+def _has_awkward_break(pages: list[list[str]]) -> bool:
+    """글자는 맞아도 읽기 어색하게 나눈 자막인지 확인한다."""
+
+    all_words = [
+        word
+        for lines in pages
+        for line in lines
+        for word in line.split()
+    ]
+    position = 0
+
+    for page_index, lines in enumerate(pages):
+        page_words = " ".join(lines).split()
+
+        # 한 자막에 두 문장을 섞지 않는다
+        if any(SENTENCE_END.search(word) for word in page_words[:-1]):
+            return True
+
+        # 줄을 나눈 곳이 어색한 경우
+        if len(lines) == 2:
+            first_end = position + len(lines[0].split()) - 1
+
+            if _line_break_cost(all_words, first_end) >= 2:
+                return True
+
+            if _is_short_predicate(lines[1]):
+                return True
+
+            gap = abs(text_width(lines[0]) - text_width(lines[1]))
+
+            if gap > MAX_LINE_WIDTH_GAP_PX:
+                return True
+
+        # 페이지를 넘긴 곳이 어색한 경우
+        # 문장이 이어지는데 한 단어만 다음 페이지로 넘어간 경우도 어색하다
+        if page_index > 0 and not SENTENCE_END.search(all_words[position - 1]) and (
+            _page_break_cost(all_words, position - 1) >= 45
+            or len(page_words) == 1
+        ):
+            return True
+
+        position += len(page_words)
+
+    return False
+
+
 def create_narration_cues(
     narration: str,
     duration_sec: float,
+    subtitle_pages: list[list[str]] | None = None,
 ) -> list[SubtitleCue]:
-    """장면 내레이션을 페이지로 나누고 글자 수 비율로 시간을 배분한다.
+    """내레이션 자막 페이지를 만들고 글자 수 비율로 시간을 배분한다.
+
+    전달받은 페이지(AI 결과 또는 사용자 편집본)가 내레이션과 일치하면 그대로 쓰고,
+    아니면 규칙으로 다시 나눈다.
 
     단어별 음성 정렬이 아니라 글자 수 기반 추정값이다.
     반환되는 시간은 장면 시작을 0으로 하는 장면 기준 시간이다.
     """
 
-    pages = split_into_pages(narration)
+    pages = (
+        validate_subtitle_pages(subtitle_pages, narration)
+        or split_into_pages(narration)
+    )
 
     if not pages:
         raise ValueError("자막 텍스트가 비어 있습니다.")

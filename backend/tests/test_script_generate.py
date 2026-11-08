@@ -13,12 +13,14 @@ from app.schemas.script import (
     ScriptOutputFormat,
 )
 from app.services import script_generate
+from app.services.script_prompts import SCRIPT_INSTRUCTIONS
 from app.services.script_generate import (
     ScriptGenerationError,
     build_user_content,
     generate_script,
     load_image_data_url,
     normalize_narration_style,
+    normalize_subtitle_pages,
 )
 
 BODY = "자동차정비기능사 시험을 공부할 때는 기본 구조부터 이해해야 합니다. " * 6
@@ -45,6 +47,7 @@ def make_output(asset_ids: list[str | None]) -> ScriptOutputFormat:
                 ),
                 "narration": NARRATION,
                 "caption": "자막",
+                "subtitle_pages": [],
                 "asset_id": asset_id,
             }
             for index, asset_id in enumerate(asset_ids)
@@ -220,3 +223,68 @@ async def test_generate_script_fails_after_invalid_outputs():
         await generate_script(make_request([]))
 
     client.close.assert_awaited_once()
+
+
+# 4. AI가 나눈 자막
+def test_normalize_subtitle_pages_keeps_valid_pages():
+    pages = [["먼저 구조를", "이해해 보세요."]]
+
+    assert normalize_subtitle_pages(pages, "먼저 구조를 이해해 보세요.") == pages
+
+
+def test_normalize_subtitle_pages_applies_narration_style():
+    narration = normalize_narration_style("구조를 먼저 이해해야 합니다.")
+
+    assert normalize_subtitle_pages(
+        [["구조를 먼저", "이해해야 합니다."]],
+        narration,
+    ) == [["구조를 먼저", "이해해야 해요."]]
+
+
+def test_normalize_subtitle_pages_falls_back_to_rule_split():
+    assert normalize_subtitle_pages(
+        [["내레이션과 다른 문장"]],
+        "먼저 구조를 이해해 보세요.",
+    ) == [["먼저 구조를 이해해 보세요."]]
+
+
+@pytest.mark.asyncio
+async def test_generate_script_returns_subtitle_pages():
+    output = make_output([None, None, None, None])
+    pages = [
+        ["자동차 구조를 먼저 이해하고", "기출문제를 반복해서"],
+        ["풀어 보세요."],
+        ["틀린 문제는", "이론으로 돌아가"],
+        ["복습하는 게 좋아요."],
+    ]
+    output.scenes[0].subtitle_pages = pages
+    # 나머지 장면은 내레이션과 맞지 않는 자막이다
+    output.scenes[1].subtitle_pages = [["엉뚱한 자막"]]
+    client = mock_client(output)
+
+    with patch.object(script_generate, "get_openai_client", return_value=client):
+        result = await generate_script(make_request([]))
+
+    assert result.scenes[0].subtitle_pages == pages
+    # 쓸 수 없는 자막은 규칙으로 나눠서 항상 자막 단위를 돌려준다
+    assert result.scenes[1].subtitle_pages
+    assert result.scenes[1].subtitle_pages != [["엉뚱한 자막"]]
+
+
+@pytest.mark.asyncio
+async def test_generate_script_asks_ai_for_subtitle_pages():
+    client = mock_client(make_output([None, None, None, None]))
+
+    with patch.object(script_generate, "get_openai_client", return_value=client):
+        await generate_script(make_request([]))
+
+    instructions = client.responses.parse.await_args.kwargs["instructions"]
+
+    assert "subtitle_pages" in instructions
+
+
+def test_script_prompt_includes_each_section():
+    """제목·말투·자막·이미지 지시가 프롬프트에 들어간다."""
+
+    for keyword in ("hook_text", "해요체", "subtitle_pages", "asset_id"):
+        assert keyword in SCRIPT_INSTRUCTIONS

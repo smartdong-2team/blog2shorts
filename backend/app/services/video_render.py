@@ -8,6 +8,7 @@ import os
 
 
 from app.services.subtitle_styles import SUBTITLE_STYLES
+from app.services.subtitles import SUBTITLE_MAX_WIDTH, text_width
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
 from app.schemas.video import (
@@ -34,6 +35,7 @@ IMAGE_Y = 580
 
 # 자막 블록의 세로 중심
 SUBTITLE_CENTER_Y = 1270
+MIN_SUBTITLE_FONT_SIZE = 32
 
 SCENE_TIMEOUT_SEC = 60
 CONCAT_TIMEOUT_SEC = 120
@@ -204,20 +206,31 @@ def build_subtitle_filter(
     # FFmpeg 색상 형식: #000000@0.65
     box_color = f"{background_color}@{background_opacity}"
 
-    # 줄 배경이 겹치지 않고 맞닿는 줄 간격
-    line_height = font_size + background_padding * 2
-
     filters = []
 
     for subtitle in subtitles:
         lines = subtitle.text.splitlines()
+
+        # 직접 편집한 줄이 길면 글자를 줄여 화면 안에 넣는다
+        widest = max(text_width(line) for line in lines)
+        cue_font_size = (
+            font_size
+            if widest <= SUBTITLE_MAX_WIDTH
+            else max(
+                MIN_SUBTITLE_FONT_SIZE,
+                int(font_size * SUBTITLE_MAX_WIDTH / widest),
+            )
+        )
+
+        # 줄 배경이 겹치지 않고 맞닿는 줄 간격
+        line_height = cue_font_size + background_padding * 2
 
         for index, line in enumerate(lines):
             center_y = (
                 SUBTITLE_CENTER_Y
                 + (index - (len(lines) - 1) / 2) * line_height
             )
-            y = round(center_y - font_size / 2)
+            y = round(center_y - cue_font_size / 2)
 
             filters.append(
                 "drawtext="
@@ -225,7 +238,7 @@ def build_subtitle_filter(
                 f"text='{escape_drawtext_value(line)}':"
                 "expansion=none:"
                 f"fontcolor={font_color}:"
-                f"fontsize={font_size}:"
+                f"fontsize={cue_font_size}:"
                 f"borderw={outline_width}:"
                 f"bordercolor={outline_color}:"
                 "box=1:"

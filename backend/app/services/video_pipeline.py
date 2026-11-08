@@ -71,10 +71,11 @@ async def generate_video(
                 narration=original.narration,
                 image_path=image_paths[UUID(scene.asset_id)],
                 audio=scene.audio,
-                # 음성 전체를 자막으로 보여주되, 화면 폭에 맞게 나눈다
+                # 음성 전체를 자막으로 보여주되, 의미 단위로 나눈다
                 subtitles=create_narration_cues(
                     narration=original.narration,
                     duration_sec=scene.audio.duration_sec,
+                    subtitle_pages=original.subtitle_pages,
                 ),
                 motion=original.motion,
             )

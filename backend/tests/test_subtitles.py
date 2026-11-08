@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from app.schemas.audio import SubtitleCue
 from app.services.subtitles import (
     SUBTITLE_MAX_WIDTH,
+    clean_subtitle_pages,
     create_narration_cues,
     split_into_pages,
     text_width,
@@ -279,7 +280,143 @@ def test_create_narration_cues_rejects_empty_text():
         create_narration_cues("   ", 3.0)
 
 
-# 나열과 서술어
+# --------------------------------------------------
+# AI가 나눈 자막 페이지 검증
+# --------------------------------------------------
+NARRATION = "먼저 자동차 기본 구조와 각 장치의 작동 원리를 이해하는 게 기본이에요."
+AI_PAGES = [
+    ["먼저 자동차 기본 구조와", "각 장치의 작동 원리를"],
+    ["이해하는 게 기본이에요."],
+]
+
+
+def test_clean_subtitle_pages_accepts_exact_split():
+    assert clean_subtitle_pages(AI_PAGES, NARRATION) == AI_PAGES
+
+
+def test_clean_subtitle_pages_ignores_punctuation_and_spaces():
+    pages = [
+        ["먼저 자동차 기본구조와", "각 장치의 작동 원리를"],
+        ["이해하는 게 기본이에요"],
+    ]
+
+    assert clean_subtitle_pages(pages, NARRATION) == pages
+
+
+@pytest.mark.parametrize(
+    "pages",
+    [
+        None,
+        [],
+        # 글자가 빠지거나 바뀜
+        [["먼저 자동차 기본 구조와"], ["이해하는 게 기본이에요."]],
+        [["먼저 자동차 구조와 각 장치의", "작동 원리를 아는 게"], ["기본이에요."]],
+        # 3줄
+        [["먼저 자동차", "기본 구조와", "각 장치의 작동 원리를"], ["이해하는 게 기본이에요."]],
+        # 빈 줄·빈 페이지
+        [["먼저 자동차 기본 구조와", ""], ["각 장치의 작동 원리를 이해하는 게 기본이에요."]],
+        [[], *AI_PAGES],
+        # 화면 폭 초과
+        [[NARRATION]],
+    ],
+)
+def test_clean_subtitle_pages_rejects_invalid_pages(pages):
+    assert clean_subtitle_pages(pages, NARRATION) is None
+
+
+def test_create_narration_cues_uses_valid_ai_pages():
+    cues = create_narration_cues(NARRATION, 6.0, AI_PAGES)
+
+    assert [cue.text for cue in cues] == [
+        "먼저 자동차 기본 구조와\n각 장치의 작동 원리를",
+        "이해하는 게 기본이에요.",
+    ]
+    assert cues[-1].end_sec == pytest.approx(6.0)
+
+
+def test_create_narration_cues_falls_back_after_narration_edit():
+    """사용자가 문구를 고치면 예전 AI 자막 대신 규칙으로 다시 나눈다."""
+
+    edited = "구조부터 차근차근 살펴보면 금방 익숙해져요."
+
+    cues = create_narration_cues(edited, 4.0, AI_PAGES)
+
+    joined = " ".join(cue.text.replace("\n", " ") for cue in cues)
+    assert joined == edited
+
+
+
+@pytest.mark.parametrize(
+    "pages,narration",
+    [
+        # 앞말과 붙어야 할 말이 줄에서 끊김
+        (
+            [["먼저 구조와 원리를 잘 이해하는", "게 중요해요."]],
+            "먼저 구조와 원리를 잘 이해하는 게 중요해요.",
+        ),
+        # 페이지 경계에서 끊김
+        (
+            [["먼저 구조와 원리를 잘 이해하는"], ["게 중요해요."]],
+            "먼저 구조와 원리를 잘 이해하는 게 중요해요.",
+        ),
+        # 한 자막에 두 문장이 섞임
+        (
+            [["먼저 구조를 이해해요.", "그림도 참고해 보세요."]],
+            "먼저 구조를 이해해요. 그림도 참고해 보세요.",
+        ),
+        # 짧은 술어만 혼자 남음
+        (
+            [["공부 방법이 고민될 때가", "많아요."]],
+            "공부 방법이 고민될 때가 많아요.",
+        ),
+    ],
+)
+def test_clean_subtitle_pages_rejects_awkward_breaks(pages, narration):
+    assert clean_subtitle_pages(pages, narration) is None
+
+
+def test_clean_subtitle_pages_rejects_single_word_page():
+    """문장이 이어지는데 한 단어만 다음 페이지로 넘어가면 쓰지 않는다."""
+
+    narration = "강의는 기초부터 핵심 이론과 문제 풀이까지 체계적으로 알려줘요."
+
+    assert clean_subtitle_pages(
+        [
+            ["강의는 기초부터 핵심 이론과", "문제 풀이까지 체계적으로"],
+            ["알려줘요."],
+        ],
+        narration,
+    ) is None
+
+
+def test_clean_subtitle_pages_allows_short_full_sentence_page():
+    """한 단어라도 그 자체로 문장이면 따로 둘 수 있다."""
+
+    pages = [["탄탄히 준비해서 꼭 합격하세요!"], ["응원할게요."]]
+
+    assert clean_subtitle_pages(
+        pages,
+        "탄탄히 준비해서 꼭 합격하세요! 응원할게요.",
+    ) == pages
+
+
+def test_create_narration_cues_respects_user_edited_pages():
+    """사용자가 나눈 자막은 품질 검사 없이 그대로 쓴다."""
+
+    narration = "먼저 구조를 이해하는 게 좋아요."
+    pages = [["먼저 구조를 이해하는"], ["게 좋아요."]]
+
+    cues = create_narration_cues(narration, 4.0, pages)
+
+    assert [cue.text for cue in cues] == [
+        "먼저 구조를 이해하는",
+        "게 좋아요.",
+    ]
+
+
+# --------------------------------------------------
+# 나열과 줄 길이 균형
+# --------------------------------------------------
 def test_split_into_pages_keeps_list_together():
     """나열은 중간에서 끊지 않고, 나열이 끝난 뒤에서 줄을 나눈다."""
 
@@ -306,6 +443,24 @@ def test_split_into_pages_prefers_comma_between_clauses():
     ]
 
 
+def test_clean_subtitle_pages_rejects_break_inside_list():
+    narration = "책, 잡지, 브로슈어 등 다양한 편집디자인에 쓰여요."
+
+    assert clean_subtitle_pages(
+        [["책, 잡지,", "브로슈어 등 다양한 편집디자인에 쓰여요."]],
+        narration,
+    ) is None
+
+
+def test_clean_subtitle_pages_rejects_unbalanced_lines():
+    narration = "먼저 자동차 기본 구조부터 차근차근 이해하세요 천천히요."
+
+    assert clean_subtitle_pages(
+        [["먼저 자동차 기본 구조부터 차근차근 이해하세요", "천천히요."]],
+        narration,
+    ) is None
+
+
 def test_split_into_pages_keeps_subject_with_predicate():
     """'6회가 있으며'처럼 주어와 서술어는 떼지 않고 쉼표 뒤에서 나눈다."""
 
@@ -318,3 +473,17 @@ def test_split_into_pages_keeps_subject_with_predicate():
         ["2026년 전산세무 2급 시험은", "총 6회가 있으며,"],
         ["마지막 시험은 12월 5일에 치러져요."],
     ]
+
+
+@pytest.mark.parametrize(
+    "pages",
+    [
+        [["2026년 전산세무 2급 시험은 총 6회가"], ["있으며, 마지막 시험은", "12월 5일에 치러져요."]],
+        [["2026년 전산세무 2급 시험은 총 6회가", "있으며, 마지막 시험은"], ["12월 5일에 치러져요."]],
+    ],
+)
+def test_clean_subtitle_pages_rejects_split_predicate(pages):
+    assert clean_subtitle_pages(
+        pages,
+        "2026년 전산세무 2급 시험은 총 6회가 있으며, 마지막 시험은 12월 5일에 치러져요.",
+    ) is None

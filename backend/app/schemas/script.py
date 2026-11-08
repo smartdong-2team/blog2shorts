@@ -110,6 +110,10 @@ class ScriptScene(BaseModel):
         max_length=30,
         description="화면에 표시할 짧은 요약 자막",
     )
+    subtitle_pages: list[list[str]] = Field(
+        default_factory=list,
+        description="내레이션을 나눈 자막. 페이지별 줄 목록. 비어 있으면 서버가 규칙으로 나눈다",
+    )
     asset_id: str | None = Field(
         default=None,
         description="사용할 이미지 ID. null이면 대체 배경 사용",
@@ -204,6 +208,7 @@ class ScriptOutputScene(BaseModel):
     role: Literal["hook", "body", "cta"]
     narration: str
     caption: str
+    subtitle_pages: list[list[str]]
     asset_id: str | None
 
 

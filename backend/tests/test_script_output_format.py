@@ -36,6 +36,7 @@ def valid_output():
                 ),
                 "narration": narration,
                 "caption": "인디자인 학습",
+                "subtitle_pages": [],
                 "asset_id": None,
             }
             for i in range(4)

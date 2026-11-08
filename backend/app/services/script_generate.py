@@ -19,7 +19,9 @@ from app.schemas.script import (
     ScriptGenerateRequest,
     ScriptGenerateResponse,
 )
+from app.services.script_prompts import SCRIPT_INSTRUCTIONS
 from app.services.storage import get_asset
+from app.services.subtitles import clean_subtitle_pages, split_into_pages
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +78,28 @@ def normalize_narration_style(text: str) -> str:
         ),
         text,
     )
+
+
+def normalize_subtitle_pages(
+    pages: list[list[str]],
+    narration: str,
+) -> list[list[str]]:
+    """AI가 나눈 자막을 검사한다. 쓸 수 없으면 규칙으로 다시 나눈다.
+
+    화면에서 바로 편집할 수 있도록 항상 자막 단위를 돌려준다.
+    """
+
+    normalized = [
+        [normalize_narration_style(line) for line in lines]
+        for lines in pages
+    ]
+    cleaned = clean_subtitle_pages(normalized, narration)
+
+    if cleaned is None:
+        logger.info("AI 자막 분할을 쓸 수 없어 규칙으로 나눕니다.")
+        return split_into_pages(narration)
+
+    return cleaned
 
 
 # --------------------------------------------------
@@ -221,37 +245,6 @@ async def generate_script(
 
     client = get_openai_client()
 
-    # 훅 문구를 생성하도록 프롬프트를 변경
-    instructions = (
-        "너는 교육 콘텐츠를 숏폼 영상 대본으로 변환하는 작가야. "
-        "원본의 핵심 정보를 유지하면서 4~6개의 장면을 생성해. "
-        "첫 장면은 hook, 마지막 장면은 cta, "
-        "중간 장면은 모두 body로 구성해. "
-        "장면 순서는 1부터 시작해. "
-
-        # 영상 상단 고정 훅 문구
-        "hook_text는 영상 상단에 전체 시간 동안 고정 표시되는 문구야. "
-        "원본의 핵심 내용을 바탕으로 시청자의 관심을 끄는 문구를 작성해. "
-        "40자 이내로 작성하고, 가능하면 2줄 이내로 구성해. "
-        "구체적인 정보나 질문을 활용하되 과장하거나 허위 사실을 만들지 마. "
-        "첫 장면의 narration을 그대로 반복하지 마. "
-
-        "각 장면의 narration은 1~120자, "
-        "caption은 1~30자로 작성해. "
-        "전체 narration은 150~350자로 작성해. "
-        "narration의 모든 문장은 친근한 해요체로 끝내. "
-        "원문이 합니다체여도 '~합니다', '~입니다'를 쓰지 마. "
-        "원본에 없는 사실을 만들어내지 마. "
-
-        # 이미지 선택
-        "제공된 이미지를 직접 보고 각 장면의 내용과 가장 잘 맞는 이미지를 골라. "
-        "광고 배너, 메뉴나 웹사이트 화면 캡처, 스티커처럼 "
-        "글 내용과 관계없는 이미지는 고르지 마. "
-        "이미지는 제공된 asset_id만 사용하고, 가능하면 장면마다 다른 이미지를 써. "
-        "이미지가 제공되면 모든 장면에 이미지를 지정하고, "
-        "이미지가 하나도 없을 때만 null을 사용해."
-    )
-
     user_content = await build_user_content(request)
 
     try:
@@ -260,7 +253,7 @@ async def generate_script(
                 # 1. OpenAI 대본 생성
                 response = await client.responses.parse(
                     model=get_settings().openai_script_model,
-                    instructions=instructions,
+                    instructions=SCRIPT_INSTRUCTIONS,
                     input=[{"role": "user", "content": user_content}],
                     text_format=ScriptOutputFormat,
                 )
@@ -276,6 +269,10 @@ async def generate_script(
                 for scene in output["scenes"]:
                     scene["narration"] = normalize_narration_style(
                         scene["narration"]
+                    )
+                    scene["subtitle_pages"] = normalize_subtitle_pages(
+                        scene["subtitle_pages"],
+                        scene["narration"],
                     )
 
                 # 3. 비즈니스 규칙 검증

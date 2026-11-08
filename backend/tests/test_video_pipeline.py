@@ -186,3 +186,59 @@ async def test_generate_video_with_missing_asset(
 
     # 결과 파일이 생성되지 않았는지
     assert not output_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_generate_video_uses_ai_subtitle_pages(monkeypatch, tmp_path):
+    asset_id = uuid4()
+    pages = [["테스트", "내레이션"]]
+
+    request = VideoCreateRequest(
+        scenes=[
+            {
+                "order": 1,
+                "role": "hook",
+                "narration": "테스트 내레이션",
+                "caption": "자막",
+                "asset_id": asset_id,
+                "subtitle_pages": pages,
+            }
+        ]
+    )
+
+    monkeypatch.setattr(
+        video_pipeline,
+        "get_asset",
+        Mock(return_value=Mock(path=tmp_path / "image.jpg")),
+    )
+    monkeypatch.setattr(
+        video_pipeline,
+        "generate_scene_audio",
+        AsyncMock(
+            return_value=AudioGenerationResult(
+                scenes=[
+                    SceneMedia(
+                        order=1,
+                        asset_id=str(asset_id),
+                        audio=AudioAsset(path="audio.wav", duration_sec=3.0),
+                        subtitles=[
+                            SubtitleCue(text="자막", start_sec=0.0, end_sec=3.0)
+                        ],
+                    )
+                ],
+                total_duration_sec=3.0,
+            )
+        ),
+    )
+    mock_render = AsyncMock()
+    monkeypatch.setattr(video_pipeline, "render_video", mock_render)
+
+    await video_pipeline.generate_video(
+        request=request,
+        output_path=tmp_path / "output.mp4",
+        work_dir=tmp_path / "work",
+    )
+
+    cue = mock_render.await_args.args[0].scenes[0].subtitles[0]
+    assert cue.text == "테스트\n내레이션"
+

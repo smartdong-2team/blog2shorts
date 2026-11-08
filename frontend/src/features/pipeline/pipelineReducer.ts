@@ -1,5 +1,5 @@
 import { DEFAULT_AUDIO } from '../audio/options'
-import { MAX_SCENES, MIN_SCENES, assignRoles, newSceneId } from './scenes'
+import { MAX_SCENES, MIN_SCENES, assignRoles, narrationFromSubtitles, newSceneId, subtitlesOf } from './scenes'
 import type {
   AudioSettings,
   Content,
@@ -60,11 +60,12 @@ export type PipelineAction =
   | { type: 'audio'; patch: Partial<AudioSettings> }
   | { type: 'videoQueued'; jobId: string; now: number }
   | { type: 'videoFailed'; error: string; now: number }
+  | { type: 'editSubtitles'; index: number; subtitles: string[] }
   | {
     type: 'splitScene'
     index: number
-    before: string
-    after: string
+    /** 이 자막부터 새 장면으로 나눈다 */
+    subtitleIndex: number
   }
   | {
     type: 'mergeScenePrevious'
@@ -166,6 +167,16 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         scenes: state.scenes.map((s, i) => (i === action.index ? { ...s, ...action.patch } : s)),
       }
 
+    case 'editSubtitles':
+      return {
+        ...state,
+        scenes: state.scenes.map((s, i) =>
+          i === action.index
+            ? { ...s, subtitles: action.subtitles, narration: narrationFromSubtitles(action.subtitles) }
+            : s,
+        ),
+      }
+
     // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
     case 'videoQueued':
       return {
@@ -208,6 +219,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         id: newSceneId(),
         role: 'body',
         narration: '',
+        subtitles: [''],
         caption: '',
         asset_id: state.scenes[last]?.asset_id ?? null,
         motion: 'zoom_in',
@@ -219,9 +231,11 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       if (state.scenes.length >= MAX_SCENES) return state
 
       const original = state.scenes[action.index]
-      if (!original || !action.before.trim() || !action.after.trim()) {
-        return state
-      }
+      if (!original) return state
+
+      const before = subtitlesOf(original).slice(0, action.subtitleIndex)
+      const after = subtitlesOf(original).slice(action.subtitleIndex)
+      if (!before.length || !after.length) return state
 
       const scenes = [...state.scenes]
 
@@ -230,12 +244,14 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         1,
         {
           ...original,
-          narration: action.before,
+          subtitles: before,
+          narration: narrationFromSubtitles(before),
         },
         {
           ...original,
           id: newSceneId(),
-          narration: action.after,
+          subtitles: after,
+          narration: narrationFromSubtitles(after),
         },
       )
 
@@ -254,10 +270,12 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       const scenes = [...state.scenes]
       const previous = scenes[action.index - 1]
       const current = scenes[action.index]
+      const subtitles = [...subtitlesOf(previous), ...subtitlesOf(current)]
 
       scenes.splice(action.index - 1, 2, {
         ...previous,
-        narration: `${previous.narration.trimEnd()} ${current.narration.trimStart()}`,
+        subtitles,
+        narration: narrationFromSubtitles(subtitles),
       })
 
       return {

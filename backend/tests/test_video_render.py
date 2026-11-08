@@ -896,3 +896,23 @@ async def test_run_ffmpeg_kills_process_when_cancelled():
 
     process.kill.assert_called_once()
     process.wait.assert_awaited_once()
+
+
+# ==========================================================
+# 13. 직접 편집한 긴 자막
+# ==========================================================
+
+def test_build_subtitle_filter_shrinks_long_edited_line():
+    """화면 폭을 넘는 줄은 글자를 줄여서 넣는다."""
+
+    long_text = "직접 입력한 아주 긴 자막이라서 한 줄에 모두 들어가지 않는 문장"
+
+    result = build_subtitle_filter(
+        subtitles=[
+            SubtitleCue(text=long_text, start_sec=0.0, end_sec=2.0)
+        ],
+    )
+
+    font_size = int(re.search(r"fontsize=(\d+)", result)[1])
+
+    assert font_size < SUBTITLE_STYLES["default"]["font_size"]

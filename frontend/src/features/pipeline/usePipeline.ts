@@ -12,7 +12,7 @@ import { extractContent, } from './mockApi'
 import { toPipelineScenes } from './scriptAdapter'
 
 import { initialPipeline, pipelineReducer, renderKey } from './pipelineReducer'
-import { assignRoles, estimateSec, formatSec } from './scenes'
+import { assignRoles, estimateSec, formatSec, subtitlePagesOf } from './scenes'
 import type { ContentInput, Scene, StepId } from './types'
 
 const imageCount = (text: string) => (text.match(/\[이미지 \d+\]/g) ?? []).length
@@ -177,6 +177,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         caption: scene.caption,
         asset_id: scene.asset_id!,
         motion: scene.motion,
+        subtitle_pages: subtitlePagesOf(scene),
       })),
       voice: audio.voice,
       music: audio.music,

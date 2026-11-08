@@ -40,6 +40,7 @@ export interface ScriptScene {
   role: ScriptSceneRole
   narration: string
   caption: string
+  subtitle_pages: string[][]
   asset_id: string | null
 }
 
@@ -87,6 +88,7 @@ export interface VideoCreateRequest {
     caption: string
     asset_id: string
     motion: Motion
+    subtitle_pages: string[][]
   }[]
   voice: string | null
   music: string
