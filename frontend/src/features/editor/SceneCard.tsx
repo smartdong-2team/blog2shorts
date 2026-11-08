@@ -92,14 +92,10 @@ export function SceneCard({
             ariaLabel={`장면 ${number} 움직임`}
             options={MOTION_OPTIONS}
             value={scene.motion}
-            onChange={(event) => onChange({ motion: event.target.value as Motion })}
+            onChange={(motion) => onChange({ motion: motion as Motion })}
             disabled={locked}
           />
         </div>
-
-        <Text variant="caption" tone="muted">
-          자막을 순서대로 이어 읽어 음성을 만듭니다. Enter로 줄을 나눌 수 있어요(자막 하나에 두 줄까지).
-        </Text>
 
         <div className={styles.subtitles}>
           {subtitles.map((text, position) => (

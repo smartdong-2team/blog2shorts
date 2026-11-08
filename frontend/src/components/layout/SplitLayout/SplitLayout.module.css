@@ -6,7 +6,7 @@
 }
 
 .withAside {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(0, 1fr) 340px;
 }
 
 .aside {
@@ -28,6 +28,7 @@
 
   .aside {
     position: static;
-    max-height: 50vh;
+    order: -1;
+    max-height: none;
   }
 }
