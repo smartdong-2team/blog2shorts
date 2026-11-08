@@ -50,7 +50,6 @@ export function StepCard({ step, title, message, status, meta }: StepCardProps) 
       <div className={styles.title}>{title}</div>
       <div className={styles.message}>{message}</div>
       {meta && <div className={styles.meta}>{meta}</div>}
-      {status === 'running' && <div className={styles.progress} aria-hidden="true" />}
     </div>
   )
 }
