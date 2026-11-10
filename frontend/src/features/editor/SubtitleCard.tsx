@@ -93,16 +93,7 @@ export function SubtitleCard({
         />
       </div>
 
-      <SceneThumb
-        src={imageUrl}
-        hookText={hookText}
-        subtitle={text}
-        onClick={onPickImage}
-        disabled={locked}
-        motion={scene.motion}
-        label={first ? '이미지 변경' : '여기부터 이미지 변경'}
-      />
-
+      {/* 목록 안쪽에서 펼침 목록이 잘리지 않게 썸네일 위에 둔다 */}
       {first && (
         <div className={styles.sceneSettings}>
           <TextField
@@ -124,6 +115,16 @@ export function SubtitleCard({
           />
         </div>
       )}
+
+      <SceneThumb
+        src={imageUrl}
+        hookText={hookText}
+        subtitle={text}
+        onClick={onPickImage}
+        disabled={locked}
+        motion={scene.motion}
+        label={first ? '이미지 변경' : '여기부터 이미지 변경'}
+      />
 
       <div className={styles.field}>
         <TextField

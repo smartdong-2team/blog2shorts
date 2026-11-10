@@ -35,9 +35,10 @@
   min-width: 0;
 }
 
-.sceneSettings select {
+/* 움직임 선택 상자 */
+.sceneSettings > :last-child {
   flex: 0 0 auto;
-  width: 92px;
+  width: 96px;
 }
 
 .position {
