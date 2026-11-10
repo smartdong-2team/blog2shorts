@@ -1,0 +1,29 @@
+/* CTA 앞에 놓이는 장면 추가 카드 */
+.addScene {
+  align-self: stretch;
+  flex-basis: 120px !important;
+  padding: var(--space-10);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-xl);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-soft);
+  background: var(--color-bg);
+  cursor: pointer;
+}
+
+.addScene:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.addScene:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+.addScene:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}

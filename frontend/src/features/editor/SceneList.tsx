@@ -9,6 +9,7 @@ import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec, su
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneStrip } from './SceneStrip'
+import styles from './SceneList.module.css'
 import { SubtitleCard } from './SubtitleCard'
 import { useSceneReorder } from './useSceneReorder'
 import { TextField } from '../../components/common/TextField'
@@ -142,9 +143,24 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
       <SceneStrip trackRef={trackRef} dropLeft={dropLeft}>
         {scenes.map((scene, index) => {
           const subtitles = subtitlesOf(scene)
+          const isLast = index === scenes.length - 1
 
           return (
             <Fragment key={scene.id}>
+              {/* 새 장면은 CTA 앞에 들어가므로 추가 카드도 그 자리에 둔다 */}
+              {isLast && index > 0 && dragging === null && (
+                <button
+                  type="button"
+                  className={styles.addScene}
+                  onClick={() => {
+                    dispatch({ type: 'addScene' })
+                    setFocusTarget({ index, subtitleIndex: 0 })
+                  }}
+                  disabled={locked || scenes.length >= MAX_SCENES}
+                >
+                  + 장면 추가
+                </button>
+              )}
               {subtitles.map((_, subtitleIndex) => (
                 <SubtitleCard
                   key={`${scene.id}-${subtitleIndex}`}
@@ -189,19 +205,6 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
           )
         })}
       </SceneStrip>
-
-      <Stack direction="row">
-        <Button
-          variant="ghost"
-          onClick={() => {
-            dispatch({ type: 'addScene' })
-            setFocusTarget({ index: scenes.length - 1, subtitleIndex: 0 })
-          }}
-          disabled={locked || scenes.length >= MAX_SCENES}
-        >
-          + 장면 추가
-        </Button>
-      </Stack>
 
       <VoiceMusicPicker audio={audio} onChange={(patch) => dispatch({ type: 'audio', patch })} locked={locked} />
 
