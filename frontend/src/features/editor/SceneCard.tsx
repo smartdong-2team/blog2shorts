@@ -8,6 +8,7 @@ import { TextField } from '../../components/common/TextField'
 import { MOTION_OPTIONS, narrationSec, subtitleIssue, subtitlesOf } from '../pipeline/scenes'
 import type { Motion, Scene } from '../pipeline/types'
 import styles from './SceneCard.module.css'
+import { SceneMenu } from './SceneMenu'
 
 interface SceneCardProps {
   scene: Scene
@@ -50,6 +51,8 @@ export function SceneCard({
   const subtitles = subtitlesOf(scene)
   const chars = scene.narration.replace(/\s/g, '').length
   const number = index + 1
+  // 선택한 자막부터 나눈다. 첫 자막을 고른 상태면 둘째 자막부터
+  const splitAt = Math.min(Math.max(active, 1), subtitles.length - 1)
 
   const editSubtitle = (position: number, value: string) => {
     onSubtitlesChange(subtitles.map((text, i) => (i === position ? value : text)))
@@ -67,6 +70,33 @@ export function SceneCard({
 
   return (
     <div className={styles.scene} data-scene-card>
+      <div className={styles.head}>
+        <RoleBadge role={scene.role} index={number} />
+        <Select
+          ariaLabel={`장면 ${number} 움직임`}
+          options={MOTION_OPTIONS}
+          value={scene.motion}
+          onChange={(event) => onChange({ motion: event.target.value as Motion })}
+          disabled={locked}
+        />
+        <SceneMenu
+          label={`장면 ${number} 메뉴`}
+          items={[
+            { label: '원문에서 위치 보기', onSelect: onLocate, disabled: !scene.asset_id },
+            {
+              label: `자막 ${splitAt + 1}부터 장면 나누기`,
+              onSelect: () => onSplit(splitAt),
+              disabled: locked || !canSplit || subtitles.length < 2,
+              separated: true,
+            },
+            { label: '앞 장면과 합치기', onSelect: onMergePrevious, disabled: locked || index === 0 },
+            { label: '앞으로 이동', onSelect: () => onMove(-1), disabled: locked || index === 0, separated: true },
+            { label: '뒤로 이동', onSelect: () => onMove(1), disabled: locked || index === total - 1 },
+            { label: '장면 삭제', onSelect: onRemove, disabled: locked || !canRemove, danger: true, separated: true },
+          ]}
+        />
+      </div>
+
       <SceneThumb
         src={imageUrl}
         hookText={hookText}
@@ -76,55 +106,23 @@ export function SceneCard({
         motion={scene.motion}
         label={`장면 ${number} 이미지 변경`}
       />
-      <div className={styles.fields}>
-        <div className={styles.top}>
-          <RoleBadge role={scene.role} index={number} />
-          <TextField
-            ariaLabel={`장면 ${number} 화면 제목`}
-            placeholder="화면 상단 제목 (12자 안팎)"
-            maxLength={20}
-            value={scene.caption}
-            onChange={(event) => onChange({ caption: event.target.value })}
-            disabled={locked}
-            grow
-          />
-          <Select
-            ariaLabel={`장면 ${number} 움직임`}
-            options={MOTION_OPTIONS}
-            value={scene.motion}
-            onChange={(event) => onChange({ motion: event.target.value as Motion })}
-            disabled={locked}
-          />
-        </div>
 
-        <div className={styles.subtitles}>
-          {subtitles.map((text, position) => (
-            <div key={position} className={styles.subtitle}>
-              <div className={styles.subtitleHead}>
-                <Text variant="small" as="span">
-                  자막 {position + 1}
-                </Text>
-                <div className={styles.subtitleTools}>
-                  {position > 0 && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => onSplit(position)}
-                      disabled={locked || !canSplit}
-                      title="이 자막부터 새 장면으로 나눕니다"
-                    >
-                      여기서 장면 나누기
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    aria-label={`장면 ${number} 자막 ${position + 1} 삭제`}
-                    onClick={() => removeSubtitle(position)}
-                    disabled={locked || subtitles.length <= 1}
-                  >
-                    삭제
-                  </Button>
-                </div>
-              </div>
+      <TextField
+        ariaLabel={`장면 ${number} 화면 제목`}
+        placeholder="화면 상단 제목 (12자 안팎)"
+        maxLength={20}
+        value={scene.caption}
+        onChange={(event) => onChange({ caption: event.target.value })}
+        disabled={locked}
+      />
+
+      <div className={styles.subtitles}>
+        {subtitles.map((text, position) => (
+          <div key={position} className={styles.subtitle}>
+            <span className={styles.number} aria-hidden="true">
+              {position + 1}
+            </span>
+            <div className={styles.field}>
               <TextField
                 multiline
                 rows={2}
@@ -155,36 +153,27 @@ export function SceneCard({
                 }}
               />
             </div>
-          ))}
-        </div>
-
-        <div className={styles.subtitleFooter}>
-          <Button variant="ghost" onClick={addSubtitle} disabled={locked}>
-            + 자막 추가
-          </Button>
-          <Text variant="caption" tone="muted" as="span">
-            {chars}자 · 약 {narrationSec(scene.narration).toFixed(1)}초
-          </Text>
-        </div>
+            <button
+              type="button"
+              className={styles.remove}
+              aria-label={`장면 ${number} 자막 ${position + 1} 삭제`}
+              title="자막 삭제"
+              onClick={() => removeSubtitle(position)}
+              disabled={locked || subtitles.length <= 1}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
       </div>
-      <div className={styles.tools}>
-        <Button variant="icon" aria-label={`장면 ${number} 위로`} onClick={() => onMove(-1)} disabled={locked || index === 0}>
-          ←
+
+      <div className={styles.footer}>
+        <Button variant="icon" onClick={addSubtitle} disabled={locked}>
+          + 자막 추가
         </Button>
-        <Button
-          variant="icon"
-          aria-label={`장면 ${number} 아래로`}
-          onClick={() => onMove(1)}
-          disabled={locked || index === total - 1}
-        >
-          →
-        </Button>
-        <Button variant="icon" onClick={onRemove} disabled={locked || !canRemove}>
-          삭제
-        </Button>
-        <Button variant="icon" onClick={onLocate} disabled={!scene.asset_id} title="원문에서 이 장면 이미지 위치 보기">
-          원문
-        </Button>
+        <Text variant="caption" tone="muted" as="span">
+          {chars}자 · 약 {narrationSec(scene.narration).toFixed(1)}초
+        </Text>
       </div>
     </div>
   )

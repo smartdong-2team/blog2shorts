@@ -39,7 +39,7 @@
 }
 
 .track > * {
-  flex: 0 0 272px;
+  flex: 0 0 300px;
   min-width: 0;
   scroll-snap-align: start;
   cursor: auto;
