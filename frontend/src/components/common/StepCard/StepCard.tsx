@@ -11,6 +11,16 @@ const STATUS_LABEL: Record<StepStatus, string> = {
   cancelled: '중지됨',
 }
 
+/** 지금 진행 중이거나 사용자가 봐야 하는 상태만 오른쪽 위에 배지로 띄운다 */
+const SHOW_BADGE: Record<StepStatus, boolean> = {
+  idle: false,
+  running: true,
+  waiting: true,
+  done: false,
+  error: true,
+  cancelled: true,
+}
+
 interface StepCardProps {
   step: number
   title: string
@@ -25,10 +35,15 @@ export function StepCard({ step, title, message, status, meta }: StepCardProps) 
     <div className={`${styles.card} ${styles[status]}`} aria-label={`STEP ${step} ${title}: ${STATUS_LABEL[status]}`}>
       <div className={styles.step}>
         STEP {step}
-        {status === 'running' && <span className={styles.spinner} aria-hidden="true" />}
         {status === 'done' && (
           <span className={styles.check} aria-hidden="true">
             ✓
+          </span>
+        )}
+        {SHOW_BADGE[status] && (
+          <span className={styles.badge}>
+            {status === 'running' && <span className={styles.spinner} aria-hidden="true" />}
+            {STATUS_LABEL[status]}
           </span>
         )}
       </div>

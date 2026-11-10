@@ -1,0 +1,124 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+.urlField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* 입력창과 버튼을 한 덩어리로 */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  transition: border-color 0.15s;
+}
+
+.bar:focus-within {
+  border-color: var(--color-text);
+}
+
+.invalid,
+.invalid:focus-within {
+  border-color: var(--color-danger);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  /* 한글 글꼴 보정: 글자를 1px 내려 위아래 가운데로 */
+  padding: 2px var(--space-12) 0;
+  border: 0;
+  font: inherit;
+  font-size: 16px;
+  line-height: 42px;
+  color: var(--color-text);
+  background: transparent;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:disabled {
+  color: #a1a1a1;
+  -webkit-text-fill-color: #a1a1a1;
+  cursor: not-allowed;
+}
+
+.clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-surface);
+  background: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.clear:hover {
+  background: var(--color-text-soft);
+}
+
+.submit {
+  height: 44px;
+  padding: 3px 22px 0;
+  font-weight: 700;
+}
+
+.error {
+  padding: 0 var(--space-6);
+  font-size: var(--font-size-caption);
+  color: var(--color-danger);
+}
+
+.textFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.textSubmit {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .bar {
+    flex-wrap: wrap;
+  }
+
+  .input {
+    flex: 1 1 0;
+  }
+
+  .submit {
+    flex: 1 1 100%;
+  }
+}

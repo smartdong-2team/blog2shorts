@@ -119,7 +119,7 @@ export function SubtitleCard({
             ariaLabel={`장면 ${number} 움직임`}
             options={MOTION_OPTIONS}
             value={scene.motion}
-            onChange={(event) => onSceneChange({ motion: event.target.value as Motion })}
+            onChange={(motion) => onSceneChange({ motion: motion as Motion })}
             disabled={locked}
           />
         </div>

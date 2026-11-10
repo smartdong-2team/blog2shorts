@@ -69,7 +69,7 @@ export type PipelineAction =
   | { type: 'editSubtitles'; index: number; subtitles: string[] }
 
 const idleSteps = (): Record<StepId, StepState> => ({
-  1: { status: 'idle', message: '본문·이미지 대기' },
+  1: { status: 'idle', message: '대기' },
   2: { status: 'idle', message: '대기' },
   3: { status: 'idle', message: '대기' },
   4: { status: 'idle', message: '대기' },
@@ -77,7 +77,7 @@ const idleSteps = (): Record<StepId, StepState> => ({
 })
 
 export const initialPipeline: PipelineState = {
-  mode: 'review',
+  mode: 'auto',
   phase: 'idle',
   steps: idleSteps(),
   content: null,

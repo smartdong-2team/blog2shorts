@@ -35,7 +35,7 @@ export function RenderStatus({ phase, steps, stepElapsed, onCancel }: RenderStat
   } else if (phase === 'done') {
     message = `영상을 만들었습니다 · 총 ${formatSec(total)}`
   } else {
-    message = `1~3단계 완료 · ${formatSec(total)}. 장면과 음성·음악을 확인하고 영상을 만드세요.`
+    message = `1~3단계 완료 · ${formatSec(total)}`
   }
 
   return (
