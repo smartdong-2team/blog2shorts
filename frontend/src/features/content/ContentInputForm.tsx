@@ -3,6 +3,7 @@ import { Button } from '../../components/common/Button'
 import { SegmentedControl, type SegmentItem } from '../../components/common/SegmentedControl'
 import { Tabs, type TabItem } from '../../components/common/Tabs'
 import { TextField } from '../../components/common/TextField'
+import { SAMPLE_URL } from '../pipeline/mockData'
 import type { ContentInput, Mode } from '../pipeline/types'
 import styles from './ContentInputForm.module.css'
 
@@ -96,6 +97,19 @@ export function ContentInputForm({ mode, onModeChange, onStart, running }: Conte
               disabled={running}
               ref={urlRef}
             />
+            {/* 비어 있을 때는 예시 글, 입력하면 지우기 버튼 */}
+            {!url && !running && (
+              <button
+                type="button"
+                className={styles.sample}
+                onClick={() => {
+                  setUrl(SAMPLE_URL)
+                  setError(null)
+                }}
+              >
+                예시 글 넣기
+              </button>
+            )}
             {url && !running && (
               <button
                 type="button"

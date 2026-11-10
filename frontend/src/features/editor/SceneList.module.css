@@ -1,23 +1,29 @@
-.sceneList {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 20px;
-
-  width: 100%;
-  min-width: 0;
-
-  overflow-x: auto;
-  overflow-y: hidden;
-
-  padding: 8px 4px 20px;
-
-  scroll-snap-type: x proximity;
+/* CTA 앞에 놓이는 장면 추가 카드 */
+.addScene {
+  align-self: stretch;
+  flex-basis: 120px !important;
+  padding: var(--space-10);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-xl);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-soft);
+  background: var(--color-bg);
+  cursor: pointer;
 }
 
-/* 리스트 아래 표시되는 하나하나의 섹션 너비를 조절하고 싶다면 여기서 조정하면 됨 */
-.sceneList > * {
-  flex: 0 0 300px;
-  min-width: 0;
-  scroll-snap-align: start;
+.addScene:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.addScene:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+.addScene:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
 }

@@ -1,0 +1,85 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-8);
+  padding: var(--space-10);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+/* 장면이 바뀌는 카드는 앞 카드와 간격을 더 둔다 */
+.sceneStart:not(:first-child) {
+  margin-left: var(--space-14);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
+  min-height: 34px;
+}
+
+.head > :last-child {
+  margin-left: auto;
+}
+
+/* 장면 설정 줄. 모든 카드가 같은 높이를 갖도록 선택 상자 높이에 맞춘다 */
+.sceneSettings {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  height: 44px;
+}
+
+.settingLabel {
+  flex: 0 0 auto;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.sceneSettings > :last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 둘째 카드부터의 빈 자리 */
+.settingPlaceholder {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-12);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.position {
+  flex: 0 0 auto;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+/* 자막 한 줄이 영상 한 줄이라 줄바꿈 없이 보여 준다. 넘치는 부분은 커서를 옮기면 보인다 */
+.field textarea {
+  padding: var(--space-8) var(--space-10);
+  font-size: 13px;
+  line-height: 1.5;
+  scrollbar-width: none;
+}
+
+.field textarea::-webkit-scrollbar {
+  display: none;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
