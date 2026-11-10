@@ -174,7 +174,8 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
         order: index + 1,
         role: scene.role,
         narration: scene.narration,
-        caption: scene.caption,
+        // 화면 제목은 영상에 쓰이지 않지만 서버가 빈 값을 받지 않는다. 직접 추가한 장면은 비어 있다
+        caption: scene.caption.trim() || scene.narration.slice(0, 30),
         asset_id: scene.asset_id!,
         motion: scene.motion,
         subtitle_pages: subtitlePagesOf(scene),

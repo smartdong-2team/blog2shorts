@@ -27,18 +27,36 @@
   margin-left: auto;
 }
 
-/* 장면 첫 카드에만 있는 화면 제목과 움직임 */
+/* 장면 설정 줄. 모든 카드가 같은 높이를 갖도록 선택 상자 높이에 맞춘다 */
 .sceneSettings {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-8);
+  min-width: 0;
+  height: 44px;
+}
+
+.settingLabel {
+  flex: 0 0 auto;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.sceneSettings > :last-child {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-/* 움직임 선택 상자 */
-.sceneSettings > :last-child {
-  flex: 0 0 auto;
-  width: 96px;
+/* 둘째 카드부터의 빈 자리 */
+.settingPlaceholder {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-12);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
 }
 
 .position {

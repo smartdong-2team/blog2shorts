@@ -25,7 +25,7 @@ interface SubtitleCardProps {
   onSubtitleChange: (text: string) => void
   onAddSubtitle: () => void
   onRemoveSubtitle: () => void
-  onSceneChange: (patch: Partial<Pick<Scene, 'caption' | 'motion'>>) => void
+  onSceneChange: (patch: Partial<Pick<Scene, 'motion'>>) => void
   onRemoveScene: () => void
   onPickImage: () => void
   onLocate: () => void
@@ -33,7 +33,7 @@ interface SubtitleCardProps {
 
 /**
  * 자막 하나를 카드 하나로 보여 준다. 같은 장면의 카드는 이미지를 같이 쓴다.
- * 장면에 딸린 설정(움직임, 화면 제목)은 장면의 첫 카드에만 둔다.
+ * 장면에 딸린 설정(움직임)은 장면의 첫 카드에서만 고친다.
  */
 export function SubtitleCard({
   scene,
@@ -93,19 +93,11 @@ export function SubtitleCard({
         />
       </div>
 
-      {/* 목록 안쪽에서 펼침 목록이 잘리지 않게 썸네일 위에 둔다 */}
-      {first && (
-        <div className={styles.sceneSettings}>
-          <TextField
-            ariaLabel={`장면 ${number} 화면 제목`}
-            placeholder="화면 제목"
-            title="화면 상단 제목 (12자 안팎)"
-            maxLength={20}
-            value={scene.caption}
-            onChange={(event) => onSceneChange({ caption: event.target.value })}
-            disabled={locked}
-            grow
-          />
+      {/* 장면 설정은 첫 카드에서만 고치고, 나머지 카드는 같은 높이의 빈 자리로 둔다.
+          목록 안쪽에서 펼침 목록이 잘리지 않게 썸네일 위에 둔다 */}
+      <div className={styles.sceneSettings}>
+        <span className={styles.settingLabel}>움직임</span>
+        {first ? (
           <Select
             ariaLabel={`장면 ${number} 움직임`}
             options={MOTION_OPTIONS}
@@ -113,8 +105,10 @@ export function SubtitleCard({
             onChange={(motion) => onSceneChange({ motion: motion as Motion })}
             disabled={locked}
           />
-        </div>
-      )}
+        ) : (
+          <span className={styles.settingPlaceholder}>앞 카드와 같음</span>
+        )}
+      </div>
 
       <SceneThumb
         src={imageUrl}
