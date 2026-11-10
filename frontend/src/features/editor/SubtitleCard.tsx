@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentProps } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button } from '../../components/common/Button'
 import { RoleBadge } from '../../components/common/RoleBadge'
 import { SceneThumb } from '../../components/common/SceneThumb'
@@ -15,15 +15,10 @@ interface SubtitleCardProps {
   sceneIndex: number
   /** 장면 안에서 몇 번째 자막인지 */
   subtitleIndex: number
-  sceneCount: number
   imageUrl: string | null
   hookText: string
   locked: boolean
   canRemoveScene: boolean
-  /** 같은 장면의 카드를 끌고 있으면 강조 */
-  dragging: boolean
-  /** ⠿ 손잡이에 붙일 끌기·키보드 이동 동작 */
-  gripProps: ComponentProps<'button'>
   /** 새로 추가한 자막이면 입력칸에 초점을 준다 */
   focusRequested: boolean
   onFocused: () => void
@@ -31,7 +26,6 @@ interface SubtitleCardProps {
   onAddSubtitle: () => void
   onRemoveSubtitle: () => void
   onSceneChange: (patch: Partial<Pick<Scene, 'caption' | 'motion'>>) => void
-  onMove: (delta: -1 | 1) => void
   onRemoveScene: () => void
   onPickImage: () => void
   onLocate: () => void
@@ -45,20 +39,16 @@ export function SubtitleCard({
   scene,
   sceneIndex,
   subtitleIndex,
-  sceneCount,
   imageUrl,
   hookText,
   locked,
   canRemoveScene,
-  dragging,
-  gripProps,
   focusRequested,
   onFocused,
   onSubtitleChange,
   onAddSubtitle,
   onRemoveSubtitle,
   onSceneChange,
-  onMove,
   onRemoveScene,
   onPickImage,
   onLocate,
@@ -82,20 +72,11 @@ export function SubtitleCard({
   return (
     <div
       ref={cardRef}
-      className={[styles.card, first && styles.sceneStart, dragging && styles.dragging].filter(Boolean).join(' ')}
+      className={first ? `${styles.card} ${styles.sceneStart}` : styles.card}
       data-scene-card
       data-scene={sceneIndex}
     >
       <div className={styles.head}>
-        <button
-          type="button"
-          className={styles.grip}
-          aria-label={`장면 ${number} 순서 바꾸기`}
-          title="끌어서 장면 순서 바꾸기 · 키보드는 ←/→"
-          {...gripProps}
-        >
-          ⠿
-        </button>
         <RoleBadge role={scene.role} index={number} />
         {count > 1 && (
           <span className={styles.position} aria-label={`자막 ${count}개 중 ${subtitleIndex + 1}번째`}>
@@ -107,8 +88,6 @@ export function SubtitleCard({
           items={[
             { label: '원문에서 위치 보기', onSelect: onLocate, disabled: !scene.asset_id },
             { label: '이 자막 삭제', onSelect: onRemoveSubtitle, disabled: locked || count <= 1, separated: true },
-            { label: '장면 앞으로 이동', onSelect: () => onMove(-1), disabled: locked || sceneIndex === 0, separated: true },
-            { label: '장면 뒤로 이동', onSelect: () => onMove(1), disabled: locked || sceneIndex === sceneCount - 1 },
             { label: '장면 삭제', onSelect: onRemoveScene, disabled: locked || !canRemoveScene, danger: true, separated: true },
           ]}
         />

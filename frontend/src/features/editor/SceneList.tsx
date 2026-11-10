@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useState, type Dispatch } from 'react'
+import { Fragment, useCallback, useState, type Dispatch } from 'react'
 import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { Stack } from '../../components/common/Stack'
@@ -11,7 +11,6 @@ import { ImagePicker } from './ImagePicker'
 import { SceneStrip } from './SceneStrip'
 import styles from './SceneList.module.css'
 import { SubtitleCard } from './SubtitleCard'
-import { useSceneReorder } from './useSceneReorder'
 import { TextField } from '../../components/common/TextField'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
@@ -34,13 +33,6 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
   /** 새로 생긴 자막 카드. 그려진 뒤 입력칸에 초점을 준다 */
   const [focusTarget, setFocusTarget] = useState<{ index: number; subtitleIndex: number } | null>(null)
   const clearFocusTarget = useCallback(() => setFocusTarget(null), [])
-  const trackRef = useRef<HTMLDivElement>(null)
-  const { dragging, dropLeft, gripProps } = useSceneReorder({
-    trackRef,
-    locked,
-    onReorder: (from, to) => dispatch({ type: 'reorderScene', from, to }),
-    onMove: (index, delta) => dispatch({ type: 'moveScene', index, delta }),
-  })
   const { scenes, content, summary, audio, result, hookText } = state
 
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
@@ -136,11 +128,11 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
           카드 하나가 자막 하나예요(두 줄까지, Enter로 줄바꿈). 자막을 순서대로 이어 읽어 음성을 만듭니다.
         </Text>
         <Text variant="caption" tone="muted">
-          중간 카드에서 이미지를 바꾸면 그 자막부터 새 장면이 됩니다. 카드를 잡고 끌면 좌우로 넘어가고, ⠿를 끌면 장면 순서가 바뀝니다.
+          중간 카드에서 이미지를 바꾸면 그 자막부터 새 장면이 됩니다. 카드를 잡고 끌면 좌우로 넘어갑니다.
         </Text>
       </div>
 
-      <SceneStrip trackRef={trackRef} dropLeft={dropLeft}>
+      <SceneStrip>
         {scenes.map((scene, index) => {
           const subtitles = subtitlesOf(scene)
           const isLast = index === scenes.length - 1
@@ -148,7 +140,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
           return (
             <Fragment key={scene.id}>
               {/* 새 장면은 CTA 앞에 들어가므로 추가 카드도 그 자리에 둔다 */}
-              {isLast && index > 0 && dragging === null && (
+              {isLast && index > 0 && (
                 <button
                   type="button"
                   className={styles.addScene}
@@ -167,13 +159,10 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
                   scene={scene}
                   sceneIndex={index}
                   subtitleIndex={subtitleIndex}
-                  sceneCount={scenes.length}
                   imageUrl={imageUrl(scene.asset_id)}
                   hookText={hookText}
                   locked={locked}
                   canRemoveScene={scenes.length > MIN_SCENES}
-                  dragging={dragging === index}
-                  gripProps={gripProps(index)}
                   focusRequested={focusTarget?.index === index && focusTarget.subtitleIndex === subtitleIndex}
                   onFocused={clearFocusTarget}
                   onSubtitleChange={(text) =>
@@ -195,7 +184,6 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
                     dispatch({ type: 'editSubtitles', index, subtitles: subtitles.filter((_, i) => i !== subtitleIndex) })
                   }
                   onSceneChange={(patch) => dispatch({ type: 'editScene', index, patch })}
-                  onMove={(delta) => dispatch({ type: 'moveScene', index, delta })}
                   onRemoveScene={() => dispatch({ type: 'removeScene', index })}
                   onPickImage={() => setPicking({ index, subtitleIndex })}
                   onLocate={() => scene.asset_id && onLocate(scene.asset_id)}

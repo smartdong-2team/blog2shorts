@@ -53,9 +53,6 @@ export type PipelineAction =
   | { type: 'scenes'; scenes: Scene[] }
   | { type: 'rendered'; result: RenderResult; renderedWith: string; now: number }
   | { type: 'editScene'; index: number; patch: Partial<Omit<Scene, 'id' | 'role'>> }
-  | { type: 'moveScene'; index: number; delta: -1 | 1 }
-  /** from 장면을 빼서 to 위치에 끼워 넣는다 (to는 옮긴 뒤의 위치) */
-  | { type: 'reorderScene'; from: number; to: number }
   | { type: 'addScene' }
   | { type: 'removeScene'; index: number }
   | {
@@ -245,24 +242,6 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         phase: 'review',
         jobId: null,
       }
-    }
-
-    case 'moveScene': {
-      const to = action.index + action.delta
-      if (to < 0 || to >= state.scenes.length) return state
-      const scenes = [...state.scenes]
-        ;[scenes[action.index], scenes[to]] = [scenes[to], scenes[action.index]]
-      return { ...state, scenes: assignRoles(scenes) }
-    }
-
-    case 'reorderScene': {
-      const { from, to } = action
-      const last = state.scenes.length - 1
-      if (from === to || from < 0 || to < 0 || from > last || to > last) return state
-      const scenes = [...state.scenes]
-      const [moved] = scenes.splice(from, 1)
-      scenes.splice(to, 0, moved)
-      return { ...state, scenes: assignRoles(scenes) }
     }
 
     case 'addScene': {
