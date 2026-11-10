@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch } from 'react'
+import { Fragment, useCallback, useRef, useState, type Dispatch } from 'react'
 import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { Stack } from '../../components/common/Stack'
@@ -8,8 +8,8 @@ import type { PipelineAction, PipelineState } from '../pipeline/pipelineReducer'
 import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec, subtitleIssue, subtitlesOf } from '../pipeline/scenes'
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
-import { SceneCard } from './SceneCard'
-import { SceneCarousel } from './SceneCarousel'
+import { SceneStrip } from './SceneStrip'
+import { SubtitleCard } from './SubtitleCard'
 import { useSceneReorder } from './useSceneReorder'
 import { TextField } from '../../components/common/TextField'
 
@@ -28,7 +28,11 @@ interface SceneListProps {
 
 /** 3단계 결과 확인·수정 + 4단계 음성·음악 설정 + 영상 만들기 */
 export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSource, onLocate, onRender }: SceneListProps) {
-  const [picking, setPicking] = useState<number | null>(null)
+  /** 이미지를 고르는 중인 장면과, 몇 번째 자막부터 바꿀지 */
+  const [picking, setPicking] = useState<{ index: number; subtitleIndex: number } | null>(null)
+  /** 새로 생긴 자막 카드. 그려진 뒤 입력칸에 초점을 준다 */
+  const [focusTarget, setFocusTarget] = useState<{ index: number; subtitleIndex: number } | null>(null)
+  const clearFocusTarget = useCallback(() => setFocusTarget(null), [])
   const trackRef = useRef<HTMLDivElement>(null)
   const { dragging, dropLeft, gripProps } = useSceneReorder({
     trackRef,
@@ -128,51 +132,73 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
 
       <div>
         <Text variant="caption" tone="muted">
-          자막을 순서대로 이어 읽어 음성을 만듭니다. Enter로 줄을 나눌 수 있어요(자막 하나에 두 줄까지). ⠿를 끌면 장면 순서가 바뀝니다.
+          카드 하나가 자막 하나예요(두 줄까지, Enter로 줄바꿈). 자막을 순서대로 이어 읽어 음성을 만듭니다.
+        </Text>
+        <Text variant="caption" tone="muted">
+          중간 카드에서 이미지를 바꾸면 그 자막부터 새 장면이 됩니다. 카드를 잡고 끌면 좌우로 넘어가고, ⠿를 끌면 장면 순서가 바뀝니다.
         </Text>
       </div>
 
-      <SceneCarousel count={scenes.length} trackRef={trackRef} dropLeft={dropLeft} reordering={dragging !== null}>
-        {scenes.map((scene, index) => (
-          <SceneCard
-            key={scene.id}
-            scene={scene}
-            index={index}
-            total={scenes.length}
-            dragging={dragging === index}
-            gripProps={gripProps(index)}
-            imageUrl={imageUrl(scene.asset_id)}
-            hookText={hookText}
-            locked={locked}
-            canRemove={scenes.length > MIN_SCENES}
-            canSplit={scenes.length < MAX_SCENES}
-            onChange={(patch) => dispatch({ type: 'editScene', index, patch })}
-            onSubtitlesChange={(subtitles) => dispatch({ type: 'editSubtitles', index, subtitles })}
-            onMove={(delta) => dispatch({ type: 'moveScene', index, delta })}
-            onRemove={() => dispatch({ type: 'removeScene', index })}
-            onPickImage={() => setPicking(index)}
-            onLocate={() => scene.asset_id && onLocate(scene.asset_id)}
-            onSplit={(subtitleIndex) =>
-              dispatch({
-                type: 'splitScene',
-                index,
-                subtitleIndex,
-              })
-            }
+      <SceneStrip trackRef={trackRef} dropLeft={dropLeft}>
+        {scenes.map((scene, index) => {
+          const subtitles = subtitlesOf(scene)
 
-            onMergePrevious={() =>
-              dispatch({
-                type: 'mergeScenePrevious',
-                index,
-              })
-            }
-
-          />
-        ))}
-      </SceneCarousel>
+          return (
+            <Fragment key={scene.id}>
+              {subtitles.map((_, subtitleIndex) => (
+                <SubtitleCard
+                  key={`${scene.id}-${subtitleIndex}`}
+                  scene={scene}
+                  sceneIndex={index}
+                  subtitleIndex={subtitleIndex}
+                  sceneCount={scenes.length}
+                  imageUrl={imageUrl(scene.asset_id)}
+                  hookText={hookText}
+                  locked={locked}
+                  canRemoveScene={scenes.length > MIN_SCENES}
+                  dragging={dragging === index}
+                  gripProps={gripProps(index)}
+                  focusRequested={focusTarget?.index === index && focusTarget.subtitleIndex === subtitleIndex}
+                  onFocused={clearFocusTarget}
+                  onSubtitleChange={(text) =>
+                    dispatch({
+                      type: 'editSubtitles',
+                      index,
+                      subtitles: subtitles.map((value, i) => (i === subtitleIndex ? text : value)),
+                    })
+                  }
+                  onAddSubtitle={() => {
+                    dispatch({
+                      type: 'editSubtitles',
+                      index,
+                      subtitles: [...subtitles.slice(0, subtitleIndex + 1), '', ...subtitles.slice(subtitleIndex + 1)],
+                    })
+                    setFocusTarget({ index, subtitleIndex: subtitleIndex + 1 })
+                  }}
+                  onRemoveSubtitle={() =>
+                    dispatch({ type: 'editSubtitles', index, subtitles: subtitles.filter((_, i) => i !== subtitleIndex) })
+                  }
+                  onSceneChange={(patch) => dispatch({ type: 'editScene', index, patch })}
+                  onMove={(delta) => dispatch({ type: 'moveScene', index, delta })}
+                  onRemoveScene={() => dispatch({ type: 'removeScene', index })}
+                  onPickImage={() => setPicking({ index, subtitleIndex })}
+                  onLocate={() => scene.asset_id && onLocate(scene.asset_id)}
+                />
+              ))}
+            </Fragment>
+          )
+        })}
+      </SceneStrip>
 
       <Stack direction="row">
-        <Button variant="ghost" onClick={() => dispatch({ type: 'addScene' })} disabled={locked || scenes.length >= MAX_SCENES}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            dispatch({ type: 'addScene' })
+            setFocusTarget({ index: scenes.length - 1, subtitleIndex: 0 })
+          }}
+          disabled={locked || scenes.length >= MAX_SCENES}
+        >
           + 장면 추가
         </Button>
       </Stack>
@@ -206,13 +232,13 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
       <ImagePicker
         open={picking !== null}
         images={content?.images ?? []}
-        current={picking !== null ? (scenes[picking]?.asset_id ?? null) : null}
+        current={picking ? (scenes[picking.index]?.asset_id ?? null) : null}
         onPick={(assetId) => {
-          if (picking !== null) dispatch({ type: 'editScene', index: picking, patch: { asset_id: assetId } })
+          if (picking) dispatch({ type: 'setSceneImage', ...picking, assetId })
           setPicking(null)
         }}
         onUpload={(image) => {
-          if (picking !== null) dispatch({ type: 'addImage', image, sceneIndex: picking })
+          if (picking) dispatch({ type: 'addImage', image, sceneIndex: picking.index, subtitleIndex: picking.subtitleIndex })
           setPicking(null)
         }}
         onClose={() => setPicking(null)}

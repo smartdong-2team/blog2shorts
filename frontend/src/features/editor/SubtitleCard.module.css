@@ -1,8 +1,8 @@
-.scene {
+.card {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-10);
+  gap: var(--space-8);
   padding: var(--space-10);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-xl);
@@ -10,7 +10,12 @@
   min-width: 0;
 }
 
-/* 끌고 있는 장면 */
+/* 장면이 바뀌는 카드는 앞 카드와 간격을 더 둔다 */
+.sceneStart:not(:first-child) {
+  margin-left: var(--space-14);
+}
+
+/* 끌고 있는 장면의 카드 */
 .dragging {
   border-color: var(--color-accent);
   box-shadow: var(--shadow-floating);
@@ -22,6 +27,24 @@
   align-items: center;
   gap: var(--space-6);
   min-width: 0;
+  min-height: 34px;
+}
+
+.head > :last-child {
+  margin-left: auto;
+}
+
+/* 장면 첫 카드에만 있는 화면 제목과 움직임 */
+.sceneSettings {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.sceneSettings select {
+  flex: 0 0 auto;
+  width: 92px;
 }
 
 .grip {
@@ -52,30 +75,10 @@
   outline-offset: 2px;
 }
 
-.subtitles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-/* 번호 · 입력칸 · 삭제 버튼 한 줄 */
-.subtitle {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-6);
-}
-
-.number {
-  flex: 0 0 14px;
-  padding-top: var(--space-10);
+.position {
+  flex: 0 0 auto;
   font-size: var(--font-size-caption);
-  text-align: center;
   color: var(--color-text-muted);
-}
-
-.field {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 /* 자막 한 줄이 영상 한 줄이라 줄바꿈 없이 보여 준다. 넘치는 부분은 커서를 옮기면 보인다 */
@@ -90,38 +93,9 @@
   display: none;
 }
 
-.remove {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  margin-top: var(--space-6);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: var(--font-size-micro);
-  color: var(--color-text-soft);
-  background: var(--color-subtle);
-  cursor: pointer;
-}
-
-.remove:hover:not(:disabled) {
-  color: var(--color-danger);
-}
-
-.remove:disabled {
-  visibility: hidden;
-}
-
-.remove:focus-visible {
-  outline: 2px solid var(--color-text);
-  outline-offset: 2px;
-}
-
 .footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
-  padding-left: var(--space-20);
 }

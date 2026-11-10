@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
-import { sceneCards } from './sceneCards'
+import { sceneGroups } from './sceneCards'
 
 /** 목록 가장자리에서 이 거리 안으로 끌면 그쪽으로 넘긴다 */
 const EDGE_PX = 56
@@ -22,23 +22,20 @@ interface Options {
   onMove: (index: number, delta: -1 | 1) => void
 }
 
-/** 포인터 위치가 몇 번째 카드 사이인지 */
+/** 포인터 위치가 몇 번째 장면 사이인지 */
 function slotAt(track: HTMLElement, clientX: number): number {
-  return sceneCards(track).filter((card) => {
-    const rect = card.getBoundingClientRect()
-    return rect.left + rect.width / 2 < clientX
-  }).length
+  return sceneGroups(track).filter((group) => group.center < clientX).length
 }
 
-/** 끼워 넣을 자리를 표시할 x 좌표 (목록 안쪽 기준) */
+/** 끼워 넣을 자리를 표시할 x 좌표 (목록 안쪽 기준). 두 장면 사이 틈의 가운데 */
 function slotLeft(track: HTMLElement, slot: number): number {
-  const cards = sceneCards(track)
-  const gap = parseFloat(getComputedStyle(track).columnGap) || 0
-  const before = cards[slot - 1]
-  const after = cards[slot]
+  const groups = sceneGroups(track)
+  const before = groups[slot - 1]
+  const after = groups[slot]
 
-  if (after) return after.offsetLeft - gap / 2
-  if (before) return before.offsetLeft + before.offsetWidth + gap / 2
+  if (before && after) return (before.end + after.start) / 2
+  if (after) return after.start - 6
+  if (before) return before.end + 6
   return 0
 }
 

@@ -58,21 +58,18 @@ export type PipelineAction =
   | { type: 'reorderScene'; from: number; to: number }
   | { type: 'addScene' }
   | { type: 'removeScene'; index: number }
-  | { type: 'addImage'; image: ContentImage; sceneIndex: number }
+  | {
+    type: 'setSceneImage'
+    index: number
+    /** 이 자막부터 이미지를 바꾼다. 0이면 장면 전체 */
+    subtitleIndex: number
+    assetId: string | null
+  }
+  | { type: 'addImage'; image: ContentImage; sceneIndex: number; subtitleIndex: number }
   | { type: 'audio'; patch: Partial<AudioSettings> }
   | { type: 'videoQueued'; jobId: string; now: number }
   | { type: 'videoFailed'; error: string; now: number }
   | { type: 'editSubtitles'; index: number; subtitles: string[] }
-  | {
-    type: 'splitScene'
-    index: number
-    /** 이 자막부터 새 장면으로 나눈다 */
-    subtitleIndex: number
-  }
-  | {
-    type: 'mergeScenePrevious'
-    index: number
-  }
 
 const idleSteps = (): Record<StepId, StepState> => ({
   1: { status: 'idle', message: '본문·이미지 대기' },
@@ -103,6 +100,52 @@ const setStep = (state: PipelineState, step: StepId, patch: Partial<StepState>) 
   ...state,
   steps: { ...state.steps, [step]: { ...state.steps[step], ...patch } },
 })
+
+/** 두 장면을 하나로 합친다. 앞 장면의 제목과 움직임을 쓴다 */
+function joinScenes(first: Scene, second: Scene): Scene {
+  const subtitles = [...subtitlesOf(first), ...subtitlesOf(second)]
+  return { ...first, subtitles, narration: narrationFromSubtitles(subtitles) }
+}
+
+/**
+ * 장면 이미지를 바꾼다. 중간 자막부터 바꾸면 그 자막부터 새 장면이 된다.
+ * 바꾼 뒤 앞뒤 장면과 이미지가 같아지면 다시 한 장면으로 합친다.
+ * 음성과 사진 움직임이 장면 단위라, 같은 이미지가 여러 장면으로 나뉘면 끊겨 보이기 때문이다.
+ */
+function setSceneImage(scenes: Scene[], index: number, subtitleIndex: number, assetId: string | null): Scene[] {
+  const original = scenes[index]
+  if (!original || original.asset_id === assetId) return scenes
+
+  const subtitles = subtitlesOf(original)
+  const next = [...scenes]
+  let target = index
+
+  if (subtitleIndex > 0 && subtitleIndex < subtitles.length && scenes.length < MAX_SCENES) {
+    const before = subtitles.slice(0, subtitleIndex)
+    const after = subtitles.slice(subtitleIndex)
+    next.splice(
+      index,
+      1,
+      { ...original, subtitles: before, narration: narrationFromSubtitles(before) },
+      { ...original, id: newSceneId(), subtitles: after, narration: narrationFromSubtitles(after), asset_id: assetId },
+    )
+    target = index + 1
+  } else {
+    next[index] = { ...original, asset_id: assetId }
+  }
+
+  const following = next[target + 1]
+  if (following && following.asset_id === assetId && next.length > MIN_SCENES) {
+    next.splice(target, 2, joinScenes(next[target], following))
+  }
+
+  const previous = next[target - 1]
+  if (previous && previous.asset_id === assetId && next.length > MIN_SCENES) {
+    next.splice(target - 1, 2, joinScenes(previous, next[target]))
+  }
+
+  return assignRoles(next)
+}
 
 export function pipelineReducer(state: PipelineState, action: PipelineAction): PipelineState {
   switch (action.type) {
@@ -239,62 +282,8 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       return { ...state, scenes: assignRoles(scenes) }
     }
 
-    case 'splitScene': {
-      if (state.scenes.length >= MAX_SCENES) return state
-
-      const original = state.scenes[action.index]
-      if (!original) return state
-
-      const before = subtitlesOf(original).slice(0, action.subtitleIndex)
-      const after = subtitlesOf(original).slice(action.subtitleIndex)
-      if (!before.length || !after.length) return state
-
-      const scenes = [...state.scenes]
-
-      scenes.splice(
-        action.index,
-        1,
-        {
-          ...original,
-          subtitles: before,
-          narration: narrationFromSubtitles(before),
-        },
-        {
-          ...original,
-          id: newSceneId(),
-          subtitles: after,
-          narration: narrationFromSubtitles(after),
-        },
-      )
-
-      return {
-        ...state,
-        scenes: assignRoles(scenes),
-      }
-    }
-
-    case 'mergeScenePrevious': {
-      if (state.scenes.length <= MIN_SCENES) return state
-      if (action.index <= 0 || action.index >= state.scenes.length) {
-        return state
-      }
-
-      const scenes = [...state.scenes]
-      const previous = scenes[action.index - 1]
-      const current = scenes[action.index]
-      const subtitles = [...subtitlesOf(previous), ...subtitlesOf(current)]
-
-      scenes.splice(action.index - 1, 2, {
-        ...previous,
-        subtitles,
-        narration: narrationFromSubtitles(subtitles),
-      })
-
-      return {
-        ...state,
-        scenes: assignRoles(scenes),
-      }
-    }
+    case 'setSceneImage':
+      return { ...state, scenes: setSceneImage(state.scenes, action.index, action.subtitleIndex, action.assetId) }
 
     case 'removeScene':
       if (state.scenes.length <= MIN_SCENES) return state
@@ -303,7 +292,7 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     case 'addImage': {
       if (!state.content) return state
       const content = { ...state.content, images: [...state.content.images, action.image] }
-      const scenes = state.scenes.map((s, i) => (i === action.sceneIndex ? { ...s, asset_id: action.image.asset_id } : s))
+      const scenes = setSceneImage(state.scenes, action.sceneIndex, action.subtitleIndex, action.image.asset_id)
       return { ...state, content, scenes }
     }
 
