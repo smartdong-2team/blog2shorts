@@ -10,6 +10,7 @@ import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
 import { SceneCarousel } from './SceneCarousel'
+import { useSceneReorder } from './useSceneReorder'
 import { TextField } from '../../components/common/TextField'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
@@ -29,6 +30,12 @@ interface SceneListProps {
 export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSource, onLocate, onRender }: SceneListProps) {
   const [picking, setPicking] = useState<number | null>(null)
   const trackRef = useRef<HTMLDivElement>(null)
+  const { dragging, dropLeft, gripProps } = useSceneReorder({
+    trackRef,
+    locked,
+    onReorder: (from, to) => dispatch({ type: 'reorderScene', from, to }),
+    onMove: (index, delta) => dispatch({ type: 'moveScene', index, delta }),
+  })
   const { scenes, content, summary, audio, result, hookText } = state
 
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
@@ -121,17 +128,19 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
 
       <div>
         <Text variant="caption" tone="muted">
-          자막을 순서대로 이어 읽어 음성을 만듭니다. Enter로 줄을 나눌 수 있어요(자막 하나에 두 줄까지).
+          자막을 순서대로 이어 읽어 음성을 만듭니다. Enter로 줄을 나눌 수 있어요(자막 하나에 두 줄까지). ⠿를 끌면 장면 순서가 바뀝니다.
         </Text>
       </div>
 
-      <SceneCarousel count={scenes.length} trackRef={trackRef}>
+      <SceneCarousel count={scenes.length} trackRef={trackRef} dropLeft={dropLeft} reordering={dragging !== null}>
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
             scene={scene}
             index={index}
             total={scenes.length}
+            dragging={dragging === index}
+            gripProps={gripProps(index)}
             imageUrl={imageUrl(scene.asset_id)}
             hookText={hookText}
             locked={locked}

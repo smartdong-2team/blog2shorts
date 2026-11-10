@@ -9,6 +9,10 @@ interface SceneCarouselProps {
   count: number
   /** 카드가 들어 있는 가로 목록. 장면 순서 끌기에서도 같이 쓴다 */
   trackRef: RefObject<HTMLDivElement | null>
+  /** 장면을 끌 때 놓을 자리 표시 위치 (목록 안쪽 x 좌표) */
+  dropLeft?: number | null
+  /** 장면을 끄는 중. 가장자리 자동 넘김이 스냅에 막히지 않게 스냅을 끈다 */
+  reordering?: boolean
   children: ReactNode
 }
 
@@ -18,7 +22,7 @@ interface View {
 }
 
 /** 장면 카드를 좌우 버튼, 끌기, 위치 표시로 넘겨 보는 가로 목록 */
-export function SceneCarousel({ count, trackRef, children }: SceneCarouselProps) {
+export function SceneCarousel({ count, trackRef, dropLeft = null, reordering = false, children }: SceneCarouselProps) {
   const [view, setView] = useState<View>({ first: 0, last: 0 })
   const [panning, setPanning] = useState(false)
   const pan = useRef<{ x: number; scrollLeft: number } | null>(null)
@@ -109,13 +113,14 @@ export function SceneCarousel({ count, trackRef, children }: SceneCarouselProps)
 
         <div
           ref={trackRef}
-          className={panning ? `${styles.track} ${styles.panning}` : styles.track}
+          className={panning || reordering ? `${styles.track} ${styles.panning}` : styles.track}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endPan}
           onPointerCancel={endPan}
         >
           {children}
+          {dropLeft !== null && <span className={styles.drop} style={{ left: dropLeft }} aria-hidden="true" />}
         </div>
 
         <button

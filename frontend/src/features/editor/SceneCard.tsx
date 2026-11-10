@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { Button } from '../../components/common/Button'
 import { RoleBadge } from '../../components/common/RoleBadge'
 import { SceneThumb } from '../../components/common/SceneThumb'
@@ -14,6 +14,10 @@ interface SceneCardProps {
   scene: Scene
   index: number
   total: number
+  /** 끌고 있는 장면이면 강조 */
+  dragging: boolean
+  /** ⠿ 손잡이에 붙일 끌기·키보드 이동 동작 */
+  gripProps: ComponentProps<'button'>
   imageUrl: string | null
   hookText: string
   locked: boolean
@@ -33,6 +37,8 @@ export function SceneCard({
   scene,
   index,
   total,
+  dragging,
+  gripProps,
   imageUrl,
   hookText,
   locked,
@@ -69,8 +75,17 @@ export function SceneCard({
   }
 
   return (
-    <div className={styles.scene} data-scene-card>
+    <div className={dragging ? `${styles.scene} ${styles.dragging}` : styles.scene} data-scene-card>
       <div className={styles.head}>
+        <button
+          type="button"
+          className={styles.grip}
+          aria-label={`장면 ${number} 순서 바꾸기`}
+          title="끌어서 순서 바꾸기 · 키보드는 ←/→"
+          {...gripProps}
+        >
+          ⠿
+        </button>
         <RoleBadge role={scene.role} index={number} />
         <Select
           ariaLabel={`장면 ${number} 움직임`}

@@ -10,11 +10,46 @@
   min-width: 0;
 }
 
+/* 끌고 있는 장면 */
+.dragging {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-floating);
+  opacity: 0.85;
+}
+
 .head {
   display: flex;
   align-items: center;
   gap: var(--space-6);
   min-width: 0;
+}
+
+.grip {
+  flex: 0 0 auto;
+  padding: var(--space-4) var(--space-6);
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.1;
+  color: var(--color-text-muted);
+  background: var(--color-subtle);
+  cursor: grab;
+  touch-action: none;
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.grip:disabled {
+  cursor: default;
+  opacity: var(--opacity-disabled);
+}
+
+.grip:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
 }
 
 .subtitles {

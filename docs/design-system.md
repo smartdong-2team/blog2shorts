@@ -212,7 +212,7 @@ PageLayout  "블로그 → 숏폼 영상" + 부제
 ├── RenderStatus 지금 하는 일·경과 시간 + Button(danger "중지하기")
 ├── Grid(5)      StepCard × 5  컨텐츠 가져오기 · 대본 구상하기 · 장면 · 음성과 음악 · 영상 제작
 ├── SplitLayout  [가져온 컨텐츠(원문·이미지) | 장면 확인]
-│                장면 확인 = 대본 요약 + SceneCard × 4~6 + 음성과 음악(Select·Range) + Button(primary "영상 만들기")
+│                장면 확인 = 대본 요약 + SceneCarousel(SceneCard × 4~6, ⠿ 끌어서 순서 변경, ⋮ 메뉴) + 음성과 음악(Select·Range) + Button(primary "영상 만들기")
 ├── Card         완성 영상: VideoPlayer(검은 9:16) + 요약 + 장면 다시 수정하기
 └── Card         백엔드 연결 상태 (개발 확인용)
 ```
