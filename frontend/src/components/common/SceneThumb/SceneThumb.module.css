@@ -21,6 +21,21 @@
   outline-offset: 2px;
 }
 
+/* 썸네일 전체를 덮는 버튼. 누르면 사진 움직임을 다시 재생한다 */
+.previewButton {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.previewButton:disabled {
+  cursor: default;
+}
+
 /* 실제 영상에서 이미지가 표시되는 영역 */
 .imageArea {
   position: absolute;
