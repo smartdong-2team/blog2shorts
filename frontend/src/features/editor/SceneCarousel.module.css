@@ -39,7 +39,8 @@
 }
 
 .track > * {
-  flex: 0 0 300px;
+  /* 좁은 화면에서는 목록 폭에 맞춰 한 장씩 보인다 */
+  flex: 0 0 min(300px, 100%);
   min-width: 0;
   scroll-snap-align: start;
   cursor: auto;
