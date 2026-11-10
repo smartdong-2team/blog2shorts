@@ -66,7 +66,7 @@ export function SceneCard({
   }
 
   return (
-    <div className={styles.scene}>
+    <div className={styles.scene} data-scene-card>
       <SceneThumb
         src={imageUrl}
         hookText={hookText}
@@ -96,10 +96,6 @@ export function SceneCard({
             disabled={locked}
           />
         </div>
-
-        <Text variant="caption" tone="muted">
-          자막을 순서대로 이어 읽어 음성을 만듭니다. Enter로 줄을 나눌 수 있어요(자막 하나에 두 줄까지).
-        </Text>
 
         <div className={styles.subtitles}>
           {subtitles.map((text, position) => (

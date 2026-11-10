@@ -1,4 +1,4 @@
-import { useState, type Dispatch } from 'react'
+import { useRef, useState, type Dispatch } from 'react'
 import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { Stack } from '../../components/common/Stack'
@@ -9,7 +9,7 @@ import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec, su
 import { ScriptSummary } from '../script/ScriptSummary'
 import { ImagePicker } from './ImagePicker'
 import { SceneCard } from './SceneCard'
-import styles from './SceneList.module.css'
+import { SceneCarousel } from './SceneCarousel'
 import { TextField } from '../../components/common/TextField'
 
 export const SCENE_EDITOR_ID = 'scene-editor'
@@ -28,6 +28,7 @@ interface SceneListProps {
 /** 3단계 결과 확인·수정 + 4단계 음성·음악 설정 + 영상 만들기 */
 export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSource, onLocate, onRender }: SceneListProps) {
   const [picking, setPicking] = useState<number | null>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   const { scenes, content, summary, audio, result, hookText } = state
 
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
@@ -118,7 +119,13 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
         </Text>
       </div>
 
-      <div className={styles.sceneList}>
+      <div>
+        <Text variant="caption" tone="muted">
+          자막을 순서대로 이어 읽어 음성을 만듭니다. Enter로 줄을 나눌 수 있어요(자막 하나에 두 줄까지).
+        </Text>
+      </div>
+
+      <SceneCarousel count={scenes.length} trackRef={trackRef}>
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
@@ -153,7 +160,7 @@ export function SceneList({ state, dispatch, locked, sourceVisible, onToggleSour
 
           />
         ))}
-      </div>
+      </SceneCarousel>
 
       <Stack direction="row">
         <Button variant="ghost" onClick={() => dispatch({ type: 'addScene' })} disabled={locked || scenes.length >= MAX_SCENES}>
