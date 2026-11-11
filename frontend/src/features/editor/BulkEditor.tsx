@@ -15,7 +15,7 @@ const TAB_OPTIONS: { value: BulkTab; label: string }[] = [
   { value: 'script', label: '대본' },
 ]
 
-const IMAGES_NOTE = '이미지를 끌어다 놓거나 ←/→로 순서를 바꿉니다. 대본은 그대로예요'
+const IMAGES_NOTE = '←/→로 이미지를 옆 장면과 맞바꾸고, 사진을 누르면 다른 이미지로 바꿉니다. 대본은 그대로예요'
 const SCRIPT_NOTE = '"──" 줄은 장면 구분, 빈 줄은 다음 자막, 줄바꿈은 자막 안 줄바꿈(두 줄까지)'
 
 interface BulkEditorProps {
@@ -35,8 +35,6 @@ export function BulkEditor({ locked, scenes, images, onChange, onUpload }: BulkE
   /** 입력 중인 대본 글. 규칙에 맞을 때만 장면에 반영하고, 틀린 동안에는 마지막으로 맞았던 장면을 유지한다 */
   const [script, setScript] = useState(() => scenesToScript(scenes))
   const [picking, setPicking] = useState<number | null>(null)
-  /** 끌고 있는 장면 칸과, 지금 위에 올라가 있는 칸 */
-  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
 
   const blocks = useMemo(() => parseScript(script), [script])
   const issue = scriptIssue(blocks)
@@ -52,14 +50,6 @@ export function BulkEditor({ locked, scenes, images, onChange, onUpload }: BulkE
   const swap = (index: number, other: number) => {
     const next = [...assets]
     ;[next[index], next[other]] = [next[other], next[index]]
-    setAssets(next)
-  }
-
-  /** 이미지를 from 칸에서 빼서 to 칸에 끼워 넣는다 (사이 이미지는 한 칸씩 밀림) */
-  const move = (from: number, to: number) => {
-    const next = [...assets]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
     setAssets(next)
   }
 
@@ -89,34 +79,7 @@ export function BulkEditor({ locked, scenes, images, onChange, onUpload }: BulkE
               const url = imageUrl(assetId)
               const number = imageNumber(assetId)
               return (
-                <li
-                  key={scene.id}
-                  className={[
-                    styles.item,
-                    drag?.from === index && styles.dragging,
-                    drag && drag.over === index && drag.from !== index && styles.over,
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  draggable={!locked}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = 'move'
-                    event.dataTransfer.setData('text/plain', String(index))
-                    setDrag({ from: index, over: index })
-                  }}
-                  onDragOver={(event) => {
-                    if (!drag) return
-                    event.preventDefault()
-                    event.dataTransfer.dropEffect = 'move'
-                    if (drag.over !== index) setDrag({ ...drag, over: index })
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    if (drag && drag.from !== index) move(drag.from, index)
-                    setDrag(null)
-                  }}
-                  onDragEnd={() => setDrag(null)}
-                >
+                <li key={scene.id} className={styles.item}>
                   <RoleBadge role={scene.role} index={index + 1} />
                   <button
                     type="button"
@@ -126,7 +89,7 @@ export function BulkEditor({ locked, scenes, images, onChange, onUpload }: BulkE
                     aria-label={`${index + 1}번 장면 이미지 변경`}
                   >
                     {url ? (
-                      <img src={url} alt="" draggable={false} />
+                      <img src={url} alt="" />
                     ) : (
                       <span className={styles.empty}>이미지 없음</span>
                     )}

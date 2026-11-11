@@ -72,20 +72,6 @@
   background: var(--color-surface);
 }
 
-.item[draggable='true'] {
-  cursor: grab;
-}
-
-/* 끌고 있는 칸은 흐리게, 놓을 자리는 초록 테두리 */
-.dragging {
-  opacity: 0.4;
-}
-
-.over {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-bg);
-}
-
 .thumb {
   position: relative;
   width: 100%;
