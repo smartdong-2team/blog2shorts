@@ -1,7 +1,8 @@
 .main {
   max-width: var(--layout-max-width);
   margin: 0 auto;
-  padding: 56px var(--space-20) 80px;
+  /* 아래 고정 막대(ProgressDock)에 마지막 내용이 가리지 않게 막대 높이만큼 더 띄운다 */
+  padding: 56px var(--space-20) calc(var(--dock-height, 140px) + var(--space-40));
 }
 
 .header {

@@ -9,6 +9,8 @@ from app.schemas.content import (
     ImageAsset,
 )
 from app.services.content_extractor import (
+    IMAGE_MARKER,
+    image_marker,
     extract_content,
     UnsupportedUrlError,
     ExtractionError,
@@ -39,13 +41,17 @@ def extract_blog_content(request: ContentExtractRequest):
 
     # 2. 이미지 다운로드 및 저장
     images = []
+    # 추출 순서(1부터) → 저장에 성공한 이미지 순서(1부터)
+    renumber: dict[int, int] = {}
 
-    for image_url in content.image_urls:
+    for index, image_url in enumerate(content.image_urls, start=1):
         try:
             asset = save_image(image_url)
         except (ImageStorageError, requests.RequestException):
             # 이미지 저장 실패는 전체 추출 실패로 처리하지 않음
             continue
+
+        renumber[index] = len(images) + 1
 
         images.append(
             ImageAsset(
@@ -57,6 +63,14 @@ def extract_blog_content(request: ContentExtractRequest):
             )
         )
 
+    # 본문의 "[이미지 N]"을 응답 images 순서에 맞추고, 저장 못 한 이미지 자리는 지운다
+    def replace_marker(match) -> str:
+        number = renumber.get(int(match.group(1)))
+        return image_marker(number) if number else ""
+
+    text = IMAGE_MARKER.sub(replace_marker, content.text)
+    text = "\n".join(line for line in text.split("\n") if line.strip())
+
     # 3. 최종 API 응답 구성
     return ContentExtractResponse(
         source=SourceInfo(
@@ -66,6 +80,6 @@ def extract_blog_content(request: ContentExtractRequest):
             url=content.url,
         ),
         title=content.title,
-        text=content.text,
+        text=text,
         images=images,
     )

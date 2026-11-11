@@ -28,28 +28,42 @@ interface StepCardProps {
   status: StepStatus
   /** 소요 시간·비용 등 한 줄 정보 */
   meta?: string
+  /** 아래 고정 막대처럼 좁은 자리에 넣을 때 작게 */
+  compact?: boolean
 }
 
-export function StepCard({ step, title, message, status, meta }: StepCardProps) {
+export function StepCard({ step, title, message, status, meta, compact = false }: StepCardProps) {
   return (
-    <div className={`${styles.card} ${styles[status]}`} aria-label={`STEP ${step} ${title}: ${STATUS_LABEL[status]}`}>
+    <div
+      className={`${styles.card} ${styles[status]}${compact ? ` ${styles.compact}` : ''}`}
+      title={compact ? [title, message, meta].filter(Boolean).join(' · ') : undefined}
+      aria-label={`STEP ${step} ${title}: ${STATUS_LABEL[status]}`}
+    >
       <div className={styles.step}>
         STEP {step}
-        {status === 'done' && (
+        {status === 'done' && !compact && (
           <span className={styles.check} aria-hidden="true">
             ✓
           </span>
         )}
-        {SHOW_BADGE[status] && (
+        {/* 작은 카드는 안내 문구를 빼는 대신 모든 상태를 배지로 보여 준다 */}
+        {(compact || SHOW_BADGE[status]) && (
           <span className={styles.badge}>
             {status === 'running' && <span className={styles.spinner} aria-hidden="true" />}
             {STATUS_LABEL[status]}
           </span>
         )}
       </div>
-      <div className={styles.title}>{title}</div>
-      <div className={styles.message}>{message}</div>
-      {meta && <div className={styles.meta}>{meta}</div>}
+      {compact ? (
+        <div className={styles.titleRow}>
+          <span className={styles.title}>{title}</span>
+          {meta && <span className={styles.meta}>{meta}</span>}
+        </div>
+      ) : (
+        <div className={styles.title}>{title}</div>
+      )}
+      {!compact && <div className={styles.message}>{message}</div>}
+      {!compact && meta && <div className={styles.meta}>{meta}</div>}
     </div>
   )
 }

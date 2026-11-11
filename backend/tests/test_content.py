@@ -29,7 +29,7 @@ def mock_content():
         log_no="224442374562",
         url=TEST_URL,
         title="자동차정비기능사 공부방법",
-        text="자동차 정비의 기본 원리를 공부해보세요.",
+        text="자동차 정비의 기본 원리를 공부해보세요.\n[이미지 1]\n두 번째 문단\n[이미지 2]",
         image_urls=[
             "https://mblogthumb-phinf.pstatic.net/test1.jpg",
             "https://mblogthumb-phinf.pstatic.net/test2.jpg",
@@ -146,3 +146,63 @@ def test_extract_partial_image_failure():
     assert data["images"][0]["asset_id"] == (
         "d2c8f7b3-41d5-42ad-a250-599058ef0571"
     )
+
+
+# 5. 저장에 실패한 이미지 자리는 본문에서 빠지고, 남은 이미지 번호가 응답 순서에 맞춰진다
+def test_extract_renumbers_image_markers():
+    def fake_save_image(url):
+        if "test1.jpg" in url:
+            raise ImageStorageError("이미지 다운로드 실패")
+
+        return mock_asset()
+
+    with (
+        patch(
+            "app.api.v1.content.extract_content",
+            return_value=mock_content(),
+        ),
+        patch(
+            "app.api.v1.content.save_image",
+            side_effect=fake_save_image,
+        ),
+    ):
+        response = client.post(
+            "/api/v1/content/extract",
+            json={"url": TEST_URL},
+        )
+
+    data = response.json()
+    assert len(data["images"]) == 1
+    assert "[이미지 2]" not in data["text"]
+    assert data["text"] == "자동차 정비의 기본 원리를 공부해보세요.\n두 번째 문단\n[이미지 1]"
+
+
+# 6. 추출기는 <img> 자리에 "[이미지 N]"을 넣어 글과 이미지 순서를 남긴다
+def test_extractor_marks_image_positions():
+    from bs4 import BeautifulSoup
+
+    from app.services import content_extractor
+
+    html = """
+    <div class="se-main-container">
+      <p>첫 문단</p>
+      <img src="https://img.example.com/a.jpg">
+      <p>둘째 문단</p>
+      <img data-src="https://img.example.com/b.jpg">
+      <img src="https://img.example.com/a.jpg">
+      <img src="http://img.example.com/insecure.jpg">
+    </div>
+    """
+
+    with patch.object(
+        content_extractor,
+        "fetch_html",
+        return_value=BeautifulSoup(html, "html.parser"),
+    ):
+        result = content_extractor.extract_content(TEST_URL)
+
+    assert result.image_urls == [
+        "https://img.example.com/a.jpg",
+        "https://img.example.com/b.jpg",
+    ]
+    assert result.text == "첫 문단\n[이미지 1]\n둘째 문단\n[이미지 2]\n[이미지 1]"

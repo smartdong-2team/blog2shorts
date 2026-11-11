@@ -102,8 +102,19 @@ export interface VideoCreateResponse {
   status_url: string
 }
 
+/** 영상 작업 진행 상황. tts: 장면별 음성, rendering: 장면별 영상, finishing: 연결·배경음악 */
+export interface VideoProgressInfo {
+  stage: 'tts' | 'rendering' | 'finishing'
+  done: number
+  total: number
+  /** 전체 작업 기준 0~1 */
+  progress: number
+}
+
 export interface VideoStatusResponse {
   job_id: string
   status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
   error: { code: string; message: string } | null
+  /** 처리 중일 때만 */
+  progress?: VideoProgressInfo | null
 }

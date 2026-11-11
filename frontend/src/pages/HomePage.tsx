@@ -1,38 +1,42 @@
-import { useEffect, useState } from 'react'
-import { Card } from '../components/common/Card'
-import { Grid } from '../components/common/Grid'
-import { StepCard } from '../components/common/StepCard'
-import { Text } from '../components/common/Text'
+import { useEffect, useRef, useState } from 'react'
 import { ToastList } from '../components/common/Toast'
 import { PageLayout } from '../components/layout/PageLayout'
 import { SplitLayout } from '../components/layout/SplitLayout'
-import { ContentInputForm } from '../features/content/ContentInputForm'
+import { ContentInputForm, type ContentInputHandle } from '../features/content/ContentInputForm'
+import { ScenePreparing } from '../features/editor/ScenePreparing'
 import { EditorWorkspace, SCENE_EDITOR_ID, type EditorTab } from '../features/editor/EditorWorkspace'
-import { STEP_IDS, STEP_TITLES } from '../features/pipeline/pipelineReducer'
+import { ProgressDock } from '../features/pipeline/ProgressDock'
+import { RunProgress } from '../features/pipeline/RunProgress'
 import { usePipeline } from '../features/pipeline/usePipeline'
 import { VideoPreview } from '../features/video/VideoPreview'
-import { RenderStatus } from '../features/video/RenderStatus'
 import { useToast } from '../hooks/useToast'
 import { scrollToElement } from '../utils/scroll'
 
 export function HomePage() {
   const { toasts, showToast, dismissToast, clearToasts } = useToast()
-  const { state, dispatch, running, start, render, cancel, stepElapsed, stale } = usePipeline({
+  const { state, dispatch, running, start, render, cancel, stepElapsed, videoEta, stale } = usePipeline({
     onError: showToast,
     onRunStart: clearToasts,
   })
   const [tab, setTab] = useState<EditorTab>('edit')
-  const [highlight, setHighlight] = useState<{ assetId: string; n: number } | null>(null)
+  /** 장면을 자막 카드 대신 전체 보기로 보는 중인지 */
+  const [bulk, setBulk] = useState(false)
+  const inputRef = useRef<ContentInputHandle>(null)
+
+  /** 아래 막대의 영상 제작: 장면이 있으면 영상만 만들고, 아직 없으면 입력한 글로 처음부터 시작 (입력이 없으면 알림) */
+  const produce = () => {
+    if (state.scenes.length > 0) {
+      render()
+      return
+    }
+    const issue = inputRef.current?.start()
+    if (issue) showToast(issue)
+  }
 
   // 영상이 완성되면 편집 영역 위로 이동 (오른쪽, 좁은 화면에서는 위에 완성 영상이 붙는다)
   useEffect(() => {
     if (state.phase === 'done') scrollToElement(document.getElementById(SCENE_EDITOR_ID))
   }, [state.phase])
-
-  const locate = (assetId: string) => {
-    setTab('source')
-    setHighlight((prev) => ({ assetId, n: (prev?.n ?? 0) + 1 }))
-  }
 
   return (
     <PageLayout
@@ -41,33 +45,18 @@ export function HomePage() {
       <ToastList toasts={toasts} onDismiss={dismissToast} />
 
       <ContentInputForm
+        ref={inputRef}
         mode={state.mode}
         onModeChange={(mode) => dispatch({ type: 'setMode', mode })}
         onStart={(input) => {
-          setHighlight(null)
+          setBulk(false)
           setTab('edit')
           start(input)
         }}
         running={running}
       />
 
-      <RenderStatus phase={state.phase} steps={state.steps} stepElapsed={stepElapsed} onCancel={cancel} />
-
-      <Grid columns={5} compactColumns={3}>
-        {STEP_IDS.map((id) => {
-          const elapsed = stepElapsed(id)
-          return (
-            <StepCard
-              key={id}
-              step={id}
-              title={STEP_TITLES[id]}
-              message={state.steps[id].message}
-              status={state.steps[id].status}
-              meta={elapsed != null ? `${elapsed.toFixed(1)}초` : undefined}
-            />
-          )
-        })}
-      </Grid>
+      <RunProgress state={state} stepElapsed={stepElapsed} videoEta={videoEta()} />
 
       {state.content && (
         <SplitLayout asideVisible={state.result != null} aside={<VideoPreview state={state} stale={stale} />}>
@@ -78,19 +67,16 @@ export function HomePage() {
               locked={running}
               tab={tab}
               onTabChange={setTab}
-              highlight={highlight}
-              onLocate={locate}
-              onRender={render}
+              bulk={bulk}
+              onBulkChange={setBulk}
             />
           ) : (
-            <Card title="장면 확인">
-              <Text variant="small" tone="muted">
-                {running ? '대본과 장면을 만드는 중입니다.' : '장면을 만들기 전에 멈췄습니다. 위에서 다시 시작하세요.'}
-              </Text>
-            </Card>
+            <ScenePreparing running={running} steps={state.steps} stepElapsed={stepElapsed} />
           )}
         </SplitLayout>
       )}
+
+      <ProgressDock state={state} stepElapsed={stepElapsed} videoEta={videoEta()} onRender={produce} onCancel={cancel} />
     </PageLayout>
   )
 }

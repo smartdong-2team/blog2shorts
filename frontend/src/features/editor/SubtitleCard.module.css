@@ -59,6 +59,34 @@
   color: var(--color-text-muted);
 }
 
+.remove {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.remove:hover:not(:disabled) {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.remove:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+.remove:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
 .position {
   flex: 0 0 auto;
   font-size: var(--font-size-caption);

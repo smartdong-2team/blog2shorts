@@ -1,6 +1,6 @@
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 #스키마 가져오기
 from app.schemas.audio import (
@@ -18,6 +18,7 @@ async def generate_scene_audio(
     scenes: list[Any],
     output_dir: Path,
     voice: str = "alloy",
+    on_scene_done: Callable[[int, int], None] | None = None,
 ) -> AudioGenerationResult:
     """여러 장면의 TTS 음성과 자막 타임라인을 생성한다."""
 
@@ -51,6 +52,10 @@ async def generate_scene_audio(
             )
 
             audio_assets.append(audio)
+
+            # 진행률 표시용: (끝난 장면 수, 전체 장면 수)
+            if on_scene_done is not None:
+                on_scene_done(len(audio_assets), len(ordered_scenes))
 
         # 2. 실제 음성 길이를 기준으로 자막 타임라인 계산
         captions = [

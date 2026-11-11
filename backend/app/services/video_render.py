@@ -3,6 +3,7 @@ import asyncio
 import logging
 import tempfile
 from pathlib import Path
+from typing import Callable
 import os
 
 
@@ -548,8 +549,12 @@ async def mix_background_music(
 # 씬을 연결해 하나의 MP4로 합성
 async def render_video(
     request: VideoRenderRequest,
+    on_scene_done: Callable[[int, int], None] | None = None,
 ) -> VideoRenderResult:
-    """여러 장면을 렌더링하고 하나의 MP4로 연결한다."""
+    """여러 장면을 렌더링하고 하나의 MP4로 연결한다.
+
+    on_scene_done은 장면 하나를 다 만들 때마다 (끝난 장면 수, 전체 장면 수)로 불린다.
+    """
 
     output_path = request.output_path.resolve()
 
@@ -580,6 +585,9 @@ async def render_video(
 
             scene_paths.append(scene_output)
             duration_sec += scene.audio.duration_sec
+
+            if on_scene_done is not None:
+                on_scene_done(len(scene_paths), len(request.scenes))
 
         # 2. FFmpeg concat 목록 생성
         concat_file = temp_path / "concat.txt"

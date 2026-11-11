@@ -6,11 +6,25 @@
   flex-wrap: wrap;
 }
 
-.head > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* 진행 중이라 편집이 잠겼을 때 탭 줄 오른쪽 안내 */
+.lockedNote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--color-text-soft);
+  background: var(--color-subtle);
+}
+
+.lockedNote::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 
 .section {
@@ -24,4 +38,11 @@
 .sectionTitle {
   font-size: var(--font-size-heading);
   font-weight: 700;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
 }

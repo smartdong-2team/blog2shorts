@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import shutil
+from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
@@ -14,7 +15,7 @@ from app.core.config import get_settings
 from app.core.errors import classify_error
 from app.schemas.video import VideoCreateRequest
 from app.services.music import NO_MUSIC, find_track
-from app.services.video_pipeline import generate_video
+from app.services.video_pipeline import VideoProgress, generate_video
 from app.services.storage import get_asset
 
 
@@ -40,10 +41,21 @@ class VideoJobError(BaseModel):
     message: str
 
 
+class VideoProgressInfo(BaseModel):
+    # tts: 장면별 음성, rendering: 장면별 영상, finishing: 연결·배경음악
+    stage: str
+    done: int
+    total: int
+    # 전체 작업 기준 0~1
+    progress: float
+
+
 class VideoStatusResponse(BaseModel):
     job_id: str
     status: str
     error: VideoJobError | None = None
+    # 처리 중일 때만 채운다
+    progress: VideoProgressInfo | None = None
 
 
 async def run_video_job(
@@ -64,11 +76,15 @@ async def run_video_job(
     work_dir = OUTPUT_DIR / "work" / job_id
 
     # 중지 요청이 이 작업만 취소할 수 있도록 별도 태스크로 실행한다
+    def on_progress(progress: VideoProgress) -> None:
+        job["progress"] = VideoProgressInfo(**asdict(progress))
+
     task = asyncio.create_task(
         generate_video(
             request=request,
             output_path=output_path,
             work_dir=work_dir,
+            on_progress=on_progress,
         )
     )
     job["task"] = task
@@ -164,6 +180,7 @@ async def create_video(
         "output_path": None,
         "error": None,
         "task": None,
+        "progress": None,
     }
 
     # 5. 백그라운드 작업 등록
@@ -191,6 +208,7 @@ async def read_video_status(job_id: str):
         job_id=job_id,
         status=job["status"],
         error=job["error"],
+        progress=job.get("progress") if job["status"] == "processing" else None,
     )
 
 
