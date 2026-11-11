@@ -7,7 +7,6 @@ import { Text } from '../../components/common/Text'
 import { TextField } from '../../components/common/TextField'
 import { MOTION_OPTIONS, narrationSec, subtitleIssue, subtitlesOf } from '../pipeline/scenes'
 import type { Motion, Scene } from '../pipeline/types'
-import { SceneMenu } from './SceneMenu'
 import styles from './SubtitleCard.module.css'
 
 interface SubtitleCardProps {
@@ -18,6 +17,7 @@ interface SubtitleCardProps {
   imageUrl: string | null
   hookText: string
   locked: boolean
+  /** 장면을 지울 수 있는지 (최소 장면 수보다 많을 때) */
   canRemoveScene: boolean
   /** 새로 추가한 자막이면 입력칸에 초점을 준다 */
   focusRequested: boolean
@@ -28,7 +28,6 @@ interface SubtitleCardProps {
   onSceneChange: (patch: Partial<Pick<Scene, 'motion'>>) => void
   onRemoveScene: () => void
   onPickImage: () => void
-  onLocate: () => void
 }
 
 /**
@@ -51,7 +50,6 @@ export function SubtitleCard({
   onSceneChange,
   onRemoveScene,
   onPickImage,
-  onLocate,
 }: SubtitleCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const subtitles = subtitlesOf(scene)
@@ -83,14 +81,21 @@ export function SubtitleCard({
             {subtitleIndex + 1}/{count}
           </span>
         )}
-        <SceneMenu
-          label={`${name} 메뉴`}
-          items={[
-            { label: '원문에서 위치 보기', onSelect: onLocate, disabled: !scene.asset_id },
-            { label: '이 자막 삭제', onSelect: onRemoveSubtitle, disabled: locked || count <= 1, separated: true },
-            { label: '장면 삭제', onSelect: onRemoveScene, disabled: locked || !canRemoveScene, danger: true, separated: true },
-          ]}
-        />
+        {/* 이 자막만 지운다. 장면의 마지막 자막이면 장면이 지워진다 */}
+        <button
+          type="button"
+          className={styles.remove}
+          onClick={count > 1 ? onRemoveSubtitle : onRemoveScene}
+          disabled={locked || (count <= 1 && !canRemoveScene)}
+          aria-label={count > 1 ? `${name} 삭제` : `장면 ${number} 삭제`}
+          title={
+            count <= 1 && !canRemoveScene ? '장면은 최소 개수보다 줄일 수 없어요' : count > 1 ? '이 자막 삭제' : '장면 삭제'
+          }
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
 
       {/* 장면 설정은 첫 카드에서만 고치고, 나머지 카드는 같은 높이의 빈 자리로 둔다.

@@ -84,9 +84,6 @@
   opacity: 0.55;
 }
 
-.highlight {
-  border-color: var(--color-warn);
-}
 
 .labels {
   position: absolute;

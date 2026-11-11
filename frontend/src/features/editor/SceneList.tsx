@@ -15,13 +15,12 @@ interface SceneListProps {
   dispatch: Dispatch<PipelineAction>
   /** 진행 중에는 수정 불가 */
   locked: boolean
-  onLocate: (assetId: string) => void
   /** 전체 보기 중이면 자막 카드 대신 전체 보기 패널 */
   bulk: boolean
 }
 
 /** 3단계 결과 확인·수정: 훅 문구, 자막 카드(또는 전체 보기 패널) */
-export function SceneList({ state, dispatch, locked, onLocate, bulk }: SceneListProps) {
+export function SceneList({ state, dispatch, locked, bulk }: SceneListProps) {
   /** 이미지를 고르는 중인 장면과, 몇 번째 자막부터 바꿀지 */
   const [picking, setPicking] = useState<{ index: number; subtitleIndex: number } | null>(null)
   /** 새로 생긴 자막 카드. 그려진 뒤 입력칸에 초점을 준다 */
@@ -113,7 +112,6 @@ export function SceneList({ state, dispatch, locked, onLocate, bulk }: SceneList
                     onSceneChange={(patch) => dispatch({ type: 'editScene', index, patch })}
                     onRemoveScene={() => dispatch({ type: 'removeScene', index })}
                     onPickImage={() => setPicking({ index, subtitleIndex })}
-                    onLocate={() => scene.asset_id && onLocate(scene.asset_id)}
                   />
                 ))}
               </Fragment>

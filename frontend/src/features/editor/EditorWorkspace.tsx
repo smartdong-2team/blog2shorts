@@ -28,8 +28,6 @@ interface EditorWorkspaceProps {
   locked: boolean
   tab: EditorTab
   onTabChange: (tab: EditorTab) => void
-  highlight: { assetId: string; n: number } | null
-  onLocate: (assetId: string) => void
   /** 전체 보기 중인지 */
   bulk: boolean
   onBulkChange: (bulk: boolean) => void
@@ -42,8 +40,6 @@ export function EditorWorkspace({
   locked,
   tab,
   onTabChange,
-  highlight,
-  onLocate,
   bulk,
   onBulkChange,
 }: EditorWorkspaceProps) {
@@ -61,7 +57,7 @@ export function EditorWorkspace({
       </div>
 
       {tab === 'source' && content ? (
-        <ExtractResult content={content} scenes={scenes} highlight={highlight} />
+        <ExtractResult content={content} scenes={scenes} />
       ) : (
         <>
           <section className={styles.section}>
@@ -79,7 +75,6 @@ export function EditorWorkspace({
               state={state}
               dispatch={dispatch}
               locked={locked}
-              onLocate={onLocate}
               bulk={bulk}
             />
           </section>

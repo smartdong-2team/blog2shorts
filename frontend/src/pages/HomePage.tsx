@@ -18,7 +18,6 @@ export function HomePage() {
     onRunStart: clearToasts,
   })
   const [tab, setTab] = useState<EditorTab>('edit')
-  const [highlight, setHighlight] = useState<{ assetId: string; n: number } | null>(null)
   /** 장면을 자막 카드 대신 전체 보기로 보는 중인지 */
   const [bulk, setBulk] = useState(false)
 
@@ -26,11 +25,6 @@ export function HomePage() {
   useEffect(() => {
     if (state.phase === 'done') scrollToElement(document.getElementById(SCENE_EDITOR_ID))
   }, [state.phase])
-
-  const locate = (assetId: string) => {
-    setTab('source')
-    setHighlight((prev) => ({ assetId, n: (prev?.n ?? 0) + 1 }))
-  }
 
   return (
     <PageLayout
@@ -42,7 +36,6 @@ export function HomePage() {
         mode={state.mode}
         onModeChange={(mode) => dispatch({ type: 'setMode', mode })}
         onStart={(input) => {
-          setHighlight(null)
           setBulk(false)
           setTab('edit')
           start(input)
@@ -59,8 +52,6 @@ export function HomePage() {
               locked={running}
               tab={tab}
               onTabChange={setTab}
-              highlight={highlight}
-              onLocate={locate}
               bulk={bulk}
               onBulkChange={setBulk}
             />
