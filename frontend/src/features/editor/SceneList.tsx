@@ -3,11 +3,10 @@ import { Stack } from '../../components/common/Stack'
 import { Text } from '../../components/common/Text'
 import { TextField } from '../../components/common/TextField'
 import type { PipelineAction, PipelineState } from '../pipeline/pipelineReducer'
-import { MAX_SCENES, MIN_SCENES, subtitlesOf } from '../pipeline/scenes'
+import { MIN_SCENES, subtitlesOf } from '../pipeline/scenes'
 import { BulkEditor } from './BulkEditor'
 import { ImagePicker } from './ImagePicker'
 import { SceneStrip } from './SceneStrip'
-import styles from './SceneList.module.css'
 import { SubtitleCard } from './SubtitleCard'
 
 interface SceneListProps {
@@ -61,24 +60,9 @@ export function SceneList({ state, dispatch, locked, bulk }: SceneListProps) {
         <SceneStrip>
           {scenes.map((scene, index) => {
             const subtitles = subtitlesOf(scene)
-            const isLast = index === scenes.length - 1
   
             return (
               <Fragment key={scene.id}>
-                {/* 새 장면은 CTA 앞에 들어가므로 추가 카드도 그 자리에 둔다 */}
-                {isLast && index > 0 && (
-                  <button
-                    type="button"
-                    className={styles.addScene}
-                    onClick={() => {
-                      dispatch({ type: 'addScene' })
-                      setFocusTarget({ index, subtitleIndex: 0 })
-                    }}
-                    disabled={locked || scenes.length >= MAX_SCENES}
-                  >
-                    + 장면 추가
-                  </button>
-                )}
                 {subtitles.map((_, subtitleIndex) => (
                   <SubtitleCard
                     key={`${scene.id}-${subtitleIndex}`}

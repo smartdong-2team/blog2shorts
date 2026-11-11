@@ -56,7 +56,6 @@ export type PipelineAction =
   | { type: 'scenes'; scenes: Scene[] }
   | { type: 'rendered'; result: RenderResult; renderedWith: string; now: number }
   | { type: 'editScene'; index: number; patch: Partial<Omit<Scene, 'id' | 'role'>> }
-  | { type: 'addScene' }
   | { type: 'removeScene'; index: number }
   | {
     type: 'setSceneImage'
@@ -114,28 +113,37 @@ function joinScenes(first: Scene, second: Scene): Scene {
 }
 
 /**
- * 장면 이미지를 바꾼다. 중간 자막부터 바꾸면 그 자막부터 새 장면이 된다.
+ * 자막 카드 하나의 이미지를 바꾼다. 장면 가운데 카드면 장면을 [앞 | 이 카드 | 뒤]로 나눈다.
  * 바꾼 뒤 앞뒤 장면과 이미지가 같아지면 다시 한 장면으로 합친다.
  * 음성과 사진 움직임이 장면 단위라, 같은 이미지가 여러 장면으로 나뉘면 끊겨 보이기 때문이다.
+ * 장면 수가 MAX_SCENES를 넘게 되면 나누지 않고 장면 전체 이미지를 바꾼다.
  */
 function setSceneImage(scenes: Scene[], index: number, subtitleIndex: number, assetId: string | null): Scene[] {
   const original = scenes[index]
   if (!original || original.asset_id === assetId) return scenes
 
   const subtitles = subtitlesOf(original)
+  const before = subtitles.slice(0, subtitleIndex)
+  const card = subtitles.slice(subtitleIndex, subtitleIndex + 1)
+  const after = subtitles.slice(subtitleIndex + 1)
+  const pieces = [before, card, after].filter((list) => list.length > 0)
   const next = [...scenes]
   let target = index
 
-  if (subtitleIndex > 0 && subtitleIndex < subtitles.length && scenes.length < MAX_SCENES) {
-    const before = subtitles.slice(0, subtitleIndex)
-    const after = subtitles.slice(subtitleIndex)
-    next.splice(
-      index,
-      1,
-      { ...original, subtitles: before, narration: narrationFromSubtitles(before) },
-      { ...original, id: newSceneId(), subtitles: after, narration: narrationFromSubtitles(after), asset_id: assetId },
-    )
-    target = index + 1
+  if (subtitles.length > 1 && scenes.length + pieces.length - 1 <= MAX_SCENES) {
+    const make = (list: string[], id: string, asset: string | null): Scene => ({
+      ...original,
+      id,
+      subtitles: list,
+      narration: narrationFromSubtitles(list),
+      asset_id: asset,
+    })
+    const replaced: Scene[] = []
+    if (before.length) replaced.push(make(before, original.id, original.asset_id))
+    target = index + replaced.length
+    replaced.push(make(card, before.length ? newSceneId() : original.id, assetId))
+    if (after.length) replaced.push(make(after, newSceneId(), original.asset_id))
+    next.splice(index, 1, ...replaced)
   } else {
     next[index] = { ...original, asset_id: assetId }
   }
@@ -278,23 +286,6 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
         phase: 'review',
         jobId: null,
       }
-    }
-
-    case 'addScene': {
-      if (state.scenes.length >= MAX_SCENES) return state
-      const last = state.scenes.length - 1
-      const scenes = [...state.scenes]
-      // CTA 앞에 본문 장면 추가
-      scenes.splice(last, 0, {
-        id: newSceneId(),
-        role: 'body',
-        narration: '',
-        subtitles: [''],
-        caption: '',
-        asset_id: state.scenes[last]?.asset_id ?? null,
-        motion: 'zoom_in',
-      })
-      return { ...state, scenes: assignRoles(scenes) }
     }
 
     case 'setSceneImage':

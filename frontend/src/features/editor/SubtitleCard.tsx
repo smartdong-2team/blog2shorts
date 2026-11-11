@@ -122,7 +122,7 @@ export function SubtitleCard({
         onClick={onPickImage}
         disabled={locked}
         motion={scene.motion}
-        label={first ? '이미지 변경' : '여기부터 이미지 변경'}
+        label="이미지 변경"
       />
 
       <div className={styles.field}>
