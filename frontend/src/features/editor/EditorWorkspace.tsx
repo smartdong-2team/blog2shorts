@@ -53,6 +53,11 @@ export function EditorWorkspace({
     <Card id={SCENE_EDITOR_ID}>
       <div className={styles.head}>
         <Tabs items={TABS} value={tab} onChange={onTabChange} ariaLabel="편집 영역" />
+        {locked && (
+          <span className={styles.lockedNote}>
+            {state.phase === 'rendering' ? '영상 제작 중' : '대본 만드는 중'}이라 수정할 수 없어요
+          </span>
+        )}
       </div>
 
       {tab === 'source' && content ? (
