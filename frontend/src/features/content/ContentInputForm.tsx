@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useId, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from 'react'
 import { Button } from '../../components/common/Button'
 import { SegmentedControl, type SegmentItem } from '../../components/common/SegmentedControl'
 import { Tabs, type TabItem } from '../../components/common/Tabs'
@@ -31,10 +31,17 @@ interface ContentInputFormProps {
   mode: Mode
   onModeChange: (mode: Mode) => void
   onStart: (input: ContentInput) => void
+  /** 폼 밖(아래 막대의 영상 제작 버튼)에서 시작할 때 */
+  ref?: Ref<ContentInputHandle>
   running: boolean
 }
 
-export function ContentInputForm({ mode, onModeChange, onStart, running }: ContentInputFormProps) {
+export interface ContentInputHandle {
+  /** 입력값으로 시작한다. 시작하지 못하면 이유를 돌려준다 */
+  start: () => string | null
+}
+
+export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: ContentInputFormProps) {
   const [kind, setKind] = useState<InputKind>('url')
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
@@ -43,25 +50,39 @@ export function ContentInputForm({ mode, onModeChange, onStart, running }: Conte
   const urlErrorId = useId()
   const urlRef = useRef<HTMLInputElement>(null)
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
+  /** 입력값 검사. 문제가 없으면 null */
+  const inputIssue = () => {
     if (kind === 'url') {
-      if (!BLOG_URL.test(url.trim())) {
-        setError('네이버 블로그 글 주소를 넣어 주세요. 예: https://blog.naver.com/아이디/글번호')
-        return
-      }
-      setError(null)
-      onStart({ kind: 'url', url: url.trim() })
-      return
+      if (!url.trim()) return '블로그 주소를 먼저 입력해 주세요.'
+      if (!BLOG_URL.test(url.trim())) return '네이버 블로그 글 주소를 넣어 주세요. 예: https://blog.naver.com/아이디/글번호'
+      return null
     }
     const length = text.trim().length
-    if (length < MIN_TEXT) {
-      setError(`본문이 ${length}자입니다. ${MIN_TEXT}자 이상 붙여 넣어 주세요.`)
-      return
-    }
-    setError(null)
-    onStart({ kind: 'text', title, text })
+    if (length < MIN_TEXT) return `본문이 ${length}자입니다. ${MIN_TEXT}자 이상 붙여 넣어 주세요.`
+    return null
   }
+
+  const begin = () => onStart(kind === 'url' ? { kind: 'url', url: url.trim() } : { kind: 'text', title, text })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    const issue = inputIssue()
+    setError(issue)
+    if (!issue) begin()
+  }
+
+  useImperativeHandle(ref, () => ({
+    start: () => {
+      const issue = inputIssue()
+      if (issue) {
+        if (kind === 'url') urlRef.current?.focus()
+        return issue
+      }
+      setError(null)
+      begin()
+      return null
+    },
+  }))
 
   const changeKind = (next: InputKind) => {
     setKind(next)

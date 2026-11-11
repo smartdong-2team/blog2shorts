@@ -110,7 +110,7 @@ export function ProgressDock({ state, stepElapsed, onRender, onCancel }: Progres
               className={styles.button}
               onClick={onRender}
               loading={isRendering}
-              disabled={busy || scenes.length === 0 || emptyScene >= 0}
+              disabled={busy || emptyScene >= 0}
             >
               {again && <RetryIcon />}
               {renderLabel}
