@@ -33,7 +33,7 @@ export interface PipelineState {
   scenes: Scene[]
   audio: AudioSettings
   result: RenderResult | null
-  /** 마지막 렌더에 쓴 장면·음성 설정. 지금 값과 다르면 "다시 만들기" 안내 */
+  /** 마지막 렌더에 쓴 장면·음성 설정. 지금 값과 다르면 "영상 다시 제작" 안내 */
   renderedWith: string | null
   jobId: string | null
 }
@@ -154,8 +154,8 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
 
     case 'runStart': {
       if (action.phase === 'analyzing') return { ...initialPipeline, mode: state.mode, audio: state.audio, phase: 'analyzing' }
-      // 4~5단계만 다시: 이전 결과를 지우고 두 단계를 대기로
-      const steps = { ...state.steps, 4: idleSteps()[4], 5: idleSteps()[5] }
+      // 4~5단계만 다시: 편집(4단계)은 지금 장면으로 확정해 완료로 두고, 영상 제작(5단계)은 대기로
+      const steps = { ...state.steps, 4: { status: 'done' as const, message: '장면 확정' }, 5: idleSteps()[5] }
       return { ...state, phase: 'rendering', steps, result: null, jobId: null, }
     }
 

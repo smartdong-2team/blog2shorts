@@ -1,0 +1,98 @@
+.dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-line);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 6%);
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: var(--space-18);
+  align-items: stretch;
+  max-width: var(--layout-max-width);
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-20);
+}
+
+.progress {
+  min-width: 0;
+}
+
+/* 상태 문구는 화면에서 빼고 화면 읽기 프로그램에만 알린다 */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.action {
+  position: relative;
+  display: flex;
+}
+
+.button {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-xl);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.icon {
+  flex: none;
+  margin-right: var(--space-8);
+}
+
+.hint {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-4));
+  left: 0;
+  font-size: var(--font-size-micro);
+  text-align: center;
+  color: var(--color-danger);
+}
+
+@media (max-width: 900px) {
+  .inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-10);
+    padding: var(--space-10) var(--space-14);
+  }
+
+  .steps {
+    grid-template-columns: repeat(5, minmax(130px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  /* 좁은 화면에서는 단계 카드를 가리지 않게 버튼 위가 아닌 아래 줄에 */
+  .action {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .hint {
+    position: static;
+  }
+
+  .button {
+    padding-top: calc(var(--space-12) + 1px);
+    padding-bottom: calc(var(--space-12) - 1px);
+    font-size: var(--font-size-body);
+  }
+}

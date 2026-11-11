@@ -140,6 +140,55 @@
   background: var(--color-surface);
 }
 
+/* 작게: 아래 고정 막대 안에서 쓰는 크기. STEP·상태 배지 + 제목만 */
+.compact {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-10) var(--space-12);
+}
+
+/* 제목 오른쪽에 걸린 시간을 작게 */
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.compact .meta {
+  flex: none;
+  margin: 0;
+  font-size: var(--font-size-micro);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.compact .title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--font-size-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact.idle .title {
+  color: var(--color-text);
+}
+
+.compact.done .badge {
+  color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.compact.running {
+  box-shadow:
+    inset 0 0 0 1px var(--color-accent),
+    0 0 0 3px var(--color-accent-bg);
+}
+
 /* CSS Modules는 keyframes 이름도 파일 안으로 가두므로 여기서 직접 정의한다 */
 @keyframes step-spin {
   to {

@@ -267,7 +267,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     }
   }
 
-  /** 지금 장면·음성 설정으로 4~5단계 실행 (검토 후 "영상 만들기", 완성 후 "다시 만들기") */
+  /** 지금 장면·음성 설정으로 4~5단계 실행 (검토 후 "영상 제작", 완성 후 "영상 다시 제작") */
   const render = async () => {
     const { scenes } = stateRef.current
 
@@ -278,7 +278,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
 
     if (missingImage !== -1) {
       alert(
-        `${missingImage + 1}번 장면에 이미지가 없습니다.\n이미지를 선택한 후 다시 영상 만들기를 시도해주세요.`
+        `${missingImage + 1}번 장면에 이미지가 없습니다.\n이미지를 선택한 후 다시 영상 제작을 시도해주세요.`
       )
       return
     }

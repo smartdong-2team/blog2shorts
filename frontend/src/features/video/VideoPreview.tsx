@@ -32,7 +32,7 @@ export function VideoPreview({ state, stale }: VideoPreviewProps) {
         </Text>
         {stale && (
           <Text variant="caption" tone="warn">
-            설정이 바뀌었습니다. 영상 다시 만들기로 반영하세요.
+            설정이 바뀌었습니다. 영상 다시 제작으로 반영하세요.
           </Text>
         )}
       </Stack>

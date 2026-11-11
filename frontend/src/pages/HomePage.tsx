@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Card } from '../components/common/Card'
-import { Grid } from '../components/common/Grid'
-import { StepCard } from '../components/common/StepCard'
 import { Text } from '../components/common/Text'
 import { ToastList } from '../components/common/Toast'
 import { PageLayout } from '../components/layout/PageLayout'
 import { SplitLayout } from '../components/layout/SplitLayout'
 import { ContentInputForm } from '../features/content/ContentInputForm'
 import { EditorWorkspace, SCENE_EDITOR_ID, type EditorTab } from '../features/editor/EditorWorkspace'
-import { STEP_IDS, STEP_TITLES } from '../features/pipeline/pipelineReducer'
+import { ProgressDock } from '../features/pipeline/ProgressDock'
 import { usePipeline } from '../features/pipeline/usePipeline'
 import { VideoPreview } from '../features/video/VideoPreview'
-import { RenderStatus } from '../features/video/RenderStatus'
 import { useToast } from '../hooks/useToast'
 import { scrollToElement } from '../utils/scroll'
 
@@ -51,24 +48,6 @@ export function HomePage() {
         running={running}
       />
 
-      <RenderStatus phase={state.phase} steps={state.steps} stepElapsed={stepElapsed} onCancel={cancel} />
-
-      <Grid columns={5} compactColumns={3}>
-        {STEP_IDS.map((id) => {
-          const elapsed = stepElapsed(id)
-          return (
-            <StepCard
-              key={id}
-              step={id}
-              title={STEP_TITLES[id]}
-              message={state.steps[id].message}
-              status={state.steps[id].status}
-              meta={elapsed != null ? `${elapsed.toFixed(1)}초` : undefined}
-            />
-          )
-        })}
-      </Grid>
-
       {state.content && (
         <SplitLayout asideVisible={state.result != null} aside={<VideoPreview state={state} stale={stale} />}>
           {state.scenes.length > 0 ? (
@@ -80,7 +59,6 @@ export function HomePage() {
               onTabChange={setTab}
               highlight={highlight}
               onLocate={locate}
-              onRender={render}
             />
           ) : (
             <Card title="장면 확인">
@@ -91,6 +69,8 @@ export function HomePage() {
           )}
         </SplitLayout>
       )}
+
+      <ProgressDock state={state} stepElapsed={stepElapsed} onRender={render} onCancel={cancel} />
     </PageLayout>
   )
 }

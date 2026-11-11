@@ -12,7 +12,8 @@
 .aside {
   position: sticky;
   top: var(--space-12);
-  max-height: calc(100vh - var(--space-12) * 2);
+  /* 아래 고정 막대 높이만큼 빼서 미리보기 끝이 막대 뒤로 숨지 않게 */
+  max-height: calc(100vh - var(--dock-height, 0px) - var(--space-12) * 2);
   overflow: auto;
   border-radius: var(--radius-xl);
 }
