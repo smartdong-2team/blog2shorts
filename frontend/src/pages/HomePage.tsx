@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Card } from '../components/common/Card'
-import { Text } from '../components/common/Text'
 import { ToastList } from '../components/common/Toast'
 import { PageLayout } from '../components/layout/PageLayout'
 import { SplitLayout } from '../components/layout/SplitLayout'
 import { ContentInputForm } from '../features/content/ContentInputForm'
+import { ScenePreparing } from '../features/editor/ScenePreparing'
 import { EditorWorkspace, SCENE_EDITOR_ID, type EditorTab } from '../features/editor/EditorWorkspace'
 import { ProgressDock } from '../features/pipeline/ProgressDock'
 import { usePipeline } from '../features/pipeline/usePipeline'
@@ -61,11 +60,7 @@ export function HomePage() {
               onLocate={locate}
             />
           ) : (
-            <Card title="장면 확인">
-              <Text variant="small" tone="muted">
-                {running ? '대본과 장면을 만드는 중입니다.' : '장면을 만들기 전에 멈췄습니다. 위에서 다시 시작하세요.'}
-              </Text>
-            </Card>
+            <ScenePreparing running={running} steps={state.steps} stepElapsed={stepElapsed} />
           )}
         </SplitLayout>
       )}
