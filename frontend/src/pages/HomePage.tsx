@@ -19,6 +19,8 @@ export function HomePage() {
   })
   const [tab, setTab] = useState<EditorTab>('edit')
   const [highlight, setHighlight] = useState<{ assetId: string; n: number } | null>(null)
+  /** 장면을 자막 카드 대신 전체 보기로 보는 중인지 */
+  const [bulk, setBulk] = useState(false)
 
   // 영상이 완성되면 편집 영역 위로 이동 (오른쪽, 좁은 화면에서는 위에 완성 영상이 붙는다)
   useEffect(() => {
@@ -41,6 +43,7 @@ export function HomePage() {
         onModeChange={(mode) => dispatch({ type: 'setMode', mode })}
         onStart={(input) => {
           setHighlight(null)
+          setBulk(false)
           setTab('edit')
           start(input)
         }}
@@ -58,6 +61,8 @@ export function HomePage() {
               onTabChange={setTab}
               highlight={highlight}
               onLocate={locate}
+              bulk={bulk}
+              onBulkChange={setBulk}
             />
           ) : (
             <ScenePreparing running={running} steps={state.steps} stepElapsed={stepElapsed} />

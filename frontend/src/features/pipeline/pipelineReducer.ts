@@ -67,6 +67,10 @@ export type PipelineAction =
   | { type: 'videoQueued'; jobId: string; now: number }
   | { type: 'videoFailed'; error: string; now: number }
   | { type: 'editSubtitles'; index: number; subtitles: string[] }
+  /** 전체 보기 적용: 장면 전체를 바꾼다 */
+  | { type: 'replaceScenes'; scenes: Scene[] }
+  /** 장면에 넣지 않고 원문 이미지 목록에만 추가 (전체 보기에서 올린 이미지) */
+  | { type: 'contentImage'; image: ContentImage }
 
 const idleSteps = (): Record<StepId, StepState> => ({
   1: { status: 'idle', message: '대기' },
@@ -274,6 +278,13 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       const scenes = setSceneImage(state.scenes, action.sceneIndex, action.subtitleIndex, action.image.asset_id)
       return { ...state, content, scenes }
     }
+
+    case 'replaceScenes':
+      return { ...state, scenes: assignRoles(action.scenes) }
+
+    case 'contentImage':
+      if (!state.content) return state
+      return { ...state, content: { ...state.content, images: [...state.content.images, action.image] } }
 
     case 'audio':
       return { ...state, audio: { ...state.audio, ...action.patch } }
