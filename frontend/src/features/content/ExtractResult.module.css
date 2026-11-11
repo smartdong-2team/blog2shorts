@@ -33,6 +33,19 @@
   gap: var(--space-8);
 }
 
+.title {
+  margin-bottom: var(--space-8);
+  font-size: var(--font-size-title);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+/* 본문 사이 이미지는 블로그처럼 글 폭 안에서 너무 커지지 않게 */
+.body .figure {
+  width: 100%;
+  max-width: 640px;
+}
+
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));

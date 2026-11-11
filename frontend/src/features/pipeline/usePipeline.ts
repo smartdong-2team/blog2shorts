@@ -230,7 +230,8 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
           generateScript(
             {
               title: content.title,
-              text: content.text,
+              // 이미지 자리 표시는 원문 화면용이라 대본 요청에서는 뺀다 (이미지는 images로 따로 보냄)
+              text: content.text.replace(/^\[이미지 \d+\]\n?/gm, '').trim(),
               images: content.images.map((image) => ({
                 asset_id: image.asset_id,
                 alt: image.alt,

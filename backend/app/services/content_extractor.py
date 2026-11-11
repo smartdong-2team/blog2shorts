@@ -1,5 +1,6 @@
 
 import ipaddress
+import re
 import socket
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -22,6 +23,14 @@ class UnsupportedUrlError(ValueError):
 
 class ExtractionError(Exception):
     pass
+
+
+# 본문 속 이미지 자리 표시. N은 image_urls 순서(1부터)
+IMAGE_MARKER = re.compile(r"\[이미지 (\d+)\]")
+
+
+def image_marker(number: int) -> str:
+    return f"[이미지 {number}]"
 
 
 @dataclass
@@ -96,26 +105,39 @@ def fetch_html(session: requests.Session, url: str) -> BeautifulSoup:
     return BeautifulSoup(response.text, "html.parser")
 
 
+def image_url_of(image, base_url: str) -> str | None:
+    src = (
+        image.get("data-lazy-src")
+        or image.get("data-src")
+        or image.get("src")
+    )
+
+    if not src:
+        return None
+
+    image_url = urljoin(base_url, src)
+    parsed = urlparse(image_url)
+
+    if parsed.scheme == "https" and parsed.hostname:
+        return image_url
+    return None
+
+
 def extract_image_urls(content, base_url: str) -> list[str]:
-    urls = []
+    urls = [image_url_of(image, base_url) for image in content.select("img")]
+    return list(dict.fromkeys(url for url in urls if url))
+
+
+def mark_image_positions(content, image_urls: list[str], base_url: str) -> None:
+    """본문의 <img> 자리를 "[이미지 N]" 글자로 바꿔 글과 이미지 순서를 남긴다."""
+    numbers = {url: index + 1 for index, url in enumerate(image_urls)}
 
     for image in content.select("img"):
-        src = (
-            image.get("data-lazy-src")
-            or image.get("data-src")
-            or image.get("src")
-        )
-
-        if not src:
-            continue
-
-        image_url = urljoin(base_url, src)
-        parsed = urlparse(image_url)
-
-        if parsed.scheme == "https" and parsed.hostname:
-            urls.append(image_url)
-
-    return list(dict.fromkeys(urls))
+        number = numbers.get(image_url_of(image, base_url) or "")
+        if number is None:
+            image.decompose()
+        else:
+            image.replace_with(image_marker(number))
 
 
 def extract_content(url: str) -> ExtractedContent:
@@ -152,9 +174,11 @@ def extract_content(url: str) -> ExtractedContent:
             else:
                 title = title_element.get_text(" ", strip=True)
 
+            image_urls = extract_image_urls(content, mobile_url)
+            mark_image_positions(content, image_urls, mobile_url)
             text = content.get_text("\n", strip=True)
 
-            if not text:
+            if not IMAGE_MARKER.sub("", text).strip():
                 raise ExtractionError("추출된 본문이 비어 있습니다.")
 
             return ExtractedContent(
@@ -163,7 +187,7 @@ def extract_content(url: str) -> ExtractedContent:
                 url=canonical_url,
                 title=title,
                 text=text,
-                image_urls=extract_image_urls(content, mobile_url),
+                image_urls=image_urls,
             )
 
         except requests.RequestException as exc:

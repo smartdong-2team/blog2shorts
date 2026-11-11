@@ -13,7 +13,7 @@ interface ExtractResultProps {
 
 const IMAGE_LINE = /^\[이미지 (\d+)\]$/
 
-/** 가져온 원문. 본문 속 [이미지 N] 자리에 이미지를 넣어 블로그 순서 그대로 보여 준다 */
+/** 가져온 원문. 제목 아래 본문 속 [이미지 N] 자리에 이미지를 넣어 블로그 순서 그대로 보여 준다 */
 export function ExtractResult({ content, scenes, highlight }: ExtractResultProps) {
   const figures = useRef(new Map<string, HTMLElement>())
 
@@ -74,6 +74,7 @@ export function ExtractResult({ content, scenes, highlight }: ExtractResultProps
         <div className={styles.gallery}>{content.images.map((image, i) => figure(image, i + 1, `g${i}`))}</div>
       )}
       <div className={styles.body}>
+        <h2 className={styles.title}>{content.title}</h2>
         {lines.map((line, i) => {
           const match = line.match(IMAGE_LINE)
           if (!match) return <p key={i} className={styles.paragraph}>{line}</p>
