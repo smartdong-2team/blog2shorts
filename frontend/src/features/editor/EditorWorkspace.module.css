@@ -6,13 +6,6 @@
   flex-wrap: wrap;
 }
 
-.head > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .section {
   display: flex;
   flex-direction: column;

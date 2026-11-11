@@ -3,8 +3,7 @@ import { Stack } from '../../components/common/Stack'
 import { Text } from '../../components/common/Text'
 import { TextField } from '../../components/common/TextField'
 import type { PipelineAction, PipelineState } from '../pipeline/pipelineReducer'
-import { MAX_SCENES, MIN_SCENES, TARGET_MAX_SEC, TARGET_MIN_SEC, estimateSec, subtitlesOf } from '../pipeline/scenes'
-import { ScriptSummary } from '../script/ScriptSummary'
+import { MAX_SCENES, MIN_SCENES, subtitlesOf } from '../pipeline/scenes'
 import { ImagePicker } from './ImagePicker'
 import { SceneStrip } from './SceneStrip'
 import styles from './SceneList.module.css'
@@ -18,35 +17,19 @@ interface SceneListProps {
   onLocate: (assetId: string) => void
 }
 
-/** 3단계 결과 확인·수정: 요약, 훅 문구, 자막 카드 */
+/** 3단계 결과 확인·수정: 훅 문구, 자막 카드 */
 export function SceneList({ state, dispatch, locked, onLocate }: SceneListProps) {
   /** 이미지를 고르는 중인 장면과, 몇 번째 자막부터 바꿀지 */
   const [picking, setPicking] = useState<{ index: number; subtitleIndex: number } | null>(null)
   /** 새로 생긴 자막 카드. 그려진 뒤 입력칸에 초점을 준다 */
   const [focusTarget, setFocusTarget] = useState<{ index: number; subtitleIndex: number } | null>(null)
   const clearFocusTarget = useCallback(() => setFocusTarget(null), [])
-  const { scenes, content, summary, hookText } = state
+  const { scenes, content, hookText } = state
 
   const imageUrl = (assetId: string | null) => content?.images.find((i) => i.asset_id === assetId)?.url ?? null
-  const sec = estimateSec(scenes)
-  const inRange = sec >= TARGET_MIN_SEC && sec <= TARGET_MAX_SEC
 
   return (
     <Stack gap={12}>
-      {summary && <ScriptSummary summary={summary} />}
-
-      <Stack direction="row" justify="between" align="center" wrap>
-        <Text variant="small" as="span">
-          예상 길이{' '}
-          <Text variant="small" tone={inRange ? 'accent' : 'warn'} as="span">
-            약 {Math.round(sec)}초 {inRange ? '✓' : `· 목표 ${TARGET_MIN_SEC}~${TARGET_MAX_SEC}초 밖`}
-          </Text>
-        </Text>
-        <Text variant="caption" tone="muted" as="span">
-          장면 {scenes.length}개
-        </Text>
-      </Stack>
-
       <div>
         <Text variant="small">영상 상단 훅 문구</Text>
         <TextField
@@ -61,15 +44,6 @@ export function SceneList({ state, dispatch, locked, onLocate }: SceneListProps)
         />
         <Text variant="caption" tone="muted">
           {hookText.length}/40자
-        </Text>
-      </div>
-
-      <div>
-        <Text variant="caption" tone="muted">
-          카드 하나가 자막 하나예요(두 줄까지, Enter로 줄바꿈). 자막을 순서대로 이어 읽어 음성을 만듭니다.
-        </Text>
-        <Text variant="caption" tone="muted">
-          중간 카드에서 이미지를 바꾸면 그 자막부터 새 장면이 됩니다. 카드를 잡고 끌면 좌우로 넘어갑니다.
         </Text>
       </div>
 

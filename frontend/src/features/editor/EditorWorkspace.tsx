@@ -1,7 +1,6 @@
 import type { Dispatch } from 'react'
 import { Card } from '../../components/common/Card'
 import { Tabs, type TabItem } from '../../components/common/Tabs'
-import { Text } from '../../components/common/Text'
 import { VoiceMusicPicker } from '../audio/VoiceMusicPicker'
 import { ExtractResult } from '../content/ExtractResult'
 import type { PipelineAction, PipelineState } from '../pipeline/pipelineReducer'
@@ -43,11 +42,6 @@ export function EditorWorkspace({
     <Card id={SCENE_EDITOR_ID}>
       <div className={styles.head}>
         <Tabs items={TABS} value={tab} onChange={onTabChange} ariaLabel="편집 영역" />
-        {content?.title && (
-          <Text variant="small" tone="muted" as="span">
-            {content.title}
-          </Text>
-        )}
       </div>
 
       {tab === 'source' && content ? (
