@@ -6,6 +6,7 @@ import { ContentInputForm, type ContentInputHandle } from '../features/content/C
 import { ScenePreparing } from '../features/editor/ScenePreparing'
 import { EditorWorkspace, SCENE_EDITOR_ID, type EditorTab } from '../features/editor/EditorWorkspace'
 import { ProgressDock } from '../features/pipeline/ProgressDock'
+import { RunProgress } from '../features/pipeline/RunProgress'
 import { usePipeline } from '../features/pipeline/usePipeline'
 import { VideoPreview } from '../features/video/VideoPreview'
 import { useToast } from '../hooks/useToast'
@@ -13,7 +14,7 @@ import { scrollToElement } from '../utils/scroll'
 
 export function HomePage() {
   const { toasts, showToast, dismissToast, clearToasts } = useToast()
-  const { state, dispatch, running, start, render, cancel, stepElapsed, stale } = usePipeline({
+  const { state, dispatch, running, start, render, cancel, stepElapsed, videoEta, stale } = usePipeline({
     onError: showToast,
     onRunStart: clearToasts,
   })
@@ -55,6 +56,8 @@ export function HomePage() {
         running={running}
       />
 
+      <RunProgress state={state} stepElapsed={stepElapsed} videoEta={videoEta()} />
+
       {state.content && (
         <SplitLayout asideVisible={state.result != null} aside={<VideoPreview state={state} stale={stale} />}>
           {state.scenes.length > 0 ? (
@@ -73,7 +76,7 @@ export function HomePage() {
         </SplitLayout>
       )}
 
-      <ProgressDock state={state} stepElapsed={stepElapsed} onRender={produce} onCancel={cancel} />
+      <ProgressDock state={state} stepElapsed={stepElapsed} videoEta={videoEta()} onRender={produce} onCancel={cancel} />
     </PageLayout>
   )
 }

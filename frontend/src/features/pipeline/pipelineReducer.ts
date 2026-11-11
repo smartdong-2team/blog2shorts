@@ -12,13 +12,14 @@ import type {
   StepId,
   StepState,
 } from './types'
+import type { VideoProgressInfo } from '../../types/api'
 
 export const STEP_TITLES: Record<StepId, string> = {
   1: '컨텐츠 가져오기',
-  2: '대본 구상하기',
-  3: '장면',
-  4: '편집',
-  5: '영상 제작',
+  2: '대본·장면 만들기',
+  3: '편집',
+  4: '음성 만들기',
+  5: '영상 합성',
 }
 
 export const STEP_IDS: StepId[] = [1, 2, 3, 4, 5]
@@ -36,6 +37,8 @@ export interface PipelineState {
   /** 마지막 렌더에 쓴 장면·음성 설정. 지금 값과 다르면 "영상 다시 제작" 안내 */
   renderedWith: string | null
   jobId: string | null
+  /** 영상 작업 진행 상황과 받은 시각(남은 시간 계산용) */
+  videoProgress: (VideoProgressInfo & { at: number }) | null
 }
 
 export type PipelineAction =
@@ -65,6 +68,7 @@ export type PipelineAction =
   | { type: 'addImage'; image: ContentImage; sceneIndex: number; subtitleIndex: number }
   | { type: 'audio'; patch: Partial<AudioSettings> }
   | { type: 'videoQueued'; jobId: string; now: number }
+  | { type: 'videoProgress'; progress: VideoProgressInfo; now: number }
   | { type: 'videoFailed'; error: string; now: number }
   | { type: 'editSubtitles'; index: number; subtitles: string[] }
   /** 전체 보기 적용: 장면 전체를 바꾼다 */
@@ -92,6 +96,7 @@ export const initialPipeline: PipelineState = {
   result: null,
   renderedWith: null,
   jobId: null,
+  videoProgress: null,
 }
 
 /** 렌더 입력(장면·음성 설정)을 비교용 문자열로 */
@@ -158,9 +163,9 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
 
     case 'runStart': {
       if (action.phase === 'analyzing') return { ...initialPipeline, mode: state.mode, audio: state.audio, phase: 'analyzing' }
-      // 4~5단계만 다시: 편집(4단계)은 지금 장면으로 확정해 완료로 두고, 영상 제작(5단계)은 대기로
-      const steps = { ...state.steps, 4: { status: 'done' as const, message: '장면 확정' }, 5: idleSteps()[5] }
-      return { ...state, phase: 'rendering', steps, result: null, jobId: null, }
+      // 영상만 다시: 편집(3단계)은 지금 장면으로 확정해 완료로 두고, 음성·합성(4~5단계)은 대기로
+      const steps = { ...state.steps, 3: { status: 'done' as const, message: '장면 확정' }, 4: idleSteps()[4], 5: idleSteps()[5] }
+      return { ...state, phase: 'rendering', steps, result: null, jobId: null, videoProgress: null }
     }
 
     case 'stepStart':
@@ -179,11 +184,11 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
       const next = running
         ? setStep(state, running, { status: 'cancelled', message: action.message, endedAt: action.now })
         : state
-      return { ...next, phase: next.scenes.length ? 'review' : 'stopped', jobId: null }
+      return { ...next, phase: next.scenes.length ? 'review' : 'stopped', jobId: null, videoProgress: null }
     }
 
     case 'waitReview': {
-      const next = setStep(state, 4, { status: 'waiting', message: '장면 확인 후 진행' })
+      const next = setStep(state, 3, { status: 'waiting', message: '장면 확인 후 진행' })
       return { ...next, phase: 'review' }
     }
 
@@ -199,13 +204,20 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     case 'scenes':
       return { ...state, scenes: assignRoles(action.scenes) }
 
-    case 'rendered':
+    case 'rendered': {
+      // 음성 단계가 진행 중으로 남아 있으면(진행 정보를 못 받은 채 끝난 경우) 함께 완료로
+      const voiced = state.steps[4].status === 'running'
+        ? setStep(state, 4, { status: 'done', message: '음성 완료', endedAt: action.now })
+        : state
+      const started = voiced.steps[5].startedAt == null ? { startedAt: action.now } : {}
       return {
-        ...setStep(state, 5, { status: 'done', message: '영상 완성', endedAt: action.now }),
+        ...setStep(voiced, 5, { ...started, status: 'done', message: '영상 완성', endedAt: action.now }),
         phase: 'done',
         result: action.result,
         renderedWith: action.renderedWith,
+        videoProgress: null,
       }
+    }
 
     case 'editScene':
       return {
@@ -226,15 +238,35 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
     // 영상 제작 시작 시점에 jobId를 기록, 렌더링 중에는 jobId가 존재
     case 'videoQueued':
       return {
-        // 완성될 때까지 5단계를 진행 중으로 두어 중지 버튼을 보여준다
-        ...setStep(state, 5, { status: 'running', message: '음성·자막·영상 합성 중', endedAt: undefined }),
+        // 서버가 음성부터 만든다. 완성될 때까지 진행 중으로 두어 중지 버튼을 보여준다
+        ...setStep(state, 4, { status: 'running', message: '장면별 음성 만드는 중', endedAt: undefined }),
         jobId: action.jobId,
         phase: 'rendering',
       }
 
+    case 'videoProgress': {
+      const { stage, done, total } = action.progress
+      let next: PipelineState = { ...state, videoProgress: { ...action.progress, at: action.now } }
+      if (stage === 'tts') {
+        next = setStep(next, 4, { message: `장면 음성 ${done}/${total}` })
+      } else {
+        // 렌더링에 들어서면 음성 단계는 끝난 것
+        if (next.steps[4].status === 'running') {
+          next = setStep(next, 4, { status: 'done', message: `음성 ${total}개`, endedAt: action.now })
+        }
+        if (next.steps[5].status !== 'running') {
+          next = setStep(next, 5, { status: 'running', startedAt: action.now, endedAt: undefined, message: '' })
+        }
+        next = setStep(next, 5, { message: stage === 'finishing' ? '장면 연결·배경음악 합치는 중' : `장면 영상 ${done}/${total}` })
+      }
+      return next
+    }
+
     // 영상 제작 실패
     case 'videoFailed': {
-      const next = setStep(state, 5, {
+      // 진행 중이던 단계(음성 또는 합성)를 실패로
+      const failedStep: StepId = state.steps[4].status === 'running' ? 4 : 5
+      const next = setStep(state, failedStep, {
         status: 'error',
         message: '실패',
         error: action.error,

@@ -4,11 +4,14 @@ import { StepCard } from '../../components/common/StepCard'
 import { STEP_IDS, STEP_TITLES, type PipelineState } from './pipelineReducer'
 import { formatSec, subtitleIssue, subtitlesOf } from './scenes'
 import type { StepId } from './types'
+import type { VideoEta } from './RunProgress'
 import styles from './ProgressDock.module.css'
 
 interface ProgressDockProps {
   state: PipelineState
   stepElapsed: (id: StepId) => number | null
+  /** 영상 작업 진행률·남은 시간 (4~5단계 진행 중일 때) */
+  videoEta: VideoEta | null
   onRender: () => void
   onCancel: () => void
 }
@@ -47,7 +50,7 @@ function RetryIcon() {
 }
 
 /** 화면 아래 고정 막대: 진행 단계 5칸 + 오른쪽 주 버튼(진행 중엔 중지하기, 아니면 영상 제작) */
-export function ProgressDock({ state, stepElapsed, onRender, onCancel }: ProgressDockProps) {
+export function ProgressDock({ state, stepElapsed, videoEta, onRender, onCancel }: ProgressDockProps) {
   const ref = useRef<HTMLElement>(null)
 
   // 막대 실제 높이를 --dock-height 로 남겨 본문 아래 여백·미리보기 높이가 따라가게 한다
@@ -85,6 +88,13 @@ export function ProgressDock({ state, stepElapsed, onRender, onCancel }: Progres
           <div className={styles.steps}>
             {STEP_IDS.map((id) => {
               const elapsed = stepElapsed(id)
+              // 영상 작업 중인 카드에는 걸린 시간 대신 진행률·남은 시간을 작게
+              const live = steps[id].status === 'running' && id >= 4 && videoEta
+              const meta = live
+                ? `${Math.round(videoEta.progress * 100)}%${videoEta.remainingSec != null ? ` · 약 ${formatSec(videoEta.remainingSec)}` : ''}`
+                : elapsed != null
+                  ? `${elapsed.toFixed(1)}초`
+                  : undefined
               return (
                 <StepCard
                   key={id}
@@ -93,7 +103,7 @@ export function ProgressDock({ state, stepElapsed, onRender, onCancel }: Progres
                   title={STEP_TITLES[id]}
                   message={steps[id].message}
                   status={steps[id].status}
-                  meta={elapsed != null ? `${elapsed.toFixed(1)}초` : undefined}
+                  meta={meta}
                 />
               )
             })}

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1 import videos
+from app.services.video_pipeline import VideoProgress
 from app.api.v1.videos import run_video_job, video_jobs
 from app.main import app
 from app.schemas.video import VideoCreateRequest
@@ -108,7 +109,7 @@ async def test_cancel_stops_running_pipeline_and_cleans_up(tmp_path, monkeypatch
     work_dir = tmp_path / "work" / job_id
     pipeline_started = asyncio.Event()
 
-    async def slow_pipeline(request, output_path, work_dir):
+    async def slow_pipeline(request, output_path, work_dir, **kwargs):
         work_dir.mkdir(parents=True)
         pipeline_started.set()
         await asyncio.Event().wait()
@@ -133,7 +134,7 @@ async def test_completed_job_removes_work_dir(tmp_path, monkeypatch):
     job_id = make_job()
     work_dir = tmp_path / "work" / job_id
 
-    async def quick_pipeline(request, output_path, work_dir):
+    async def quick_pipeline(request, output_path, work_dir, **kwargs):
         work_dir.mkdir(parents=True)
 
     with patch("app.api.v1.videos.generate_video", quick_pipeline):
@@ -158,3 +159,31 @@ def test_browser_can_send_cancel_request():
 
     assert response.status_code == 200
     assert "DELETE" in response.headers["access-control-allow-methods"]
+
+
+@pytest.mark.asyncio
+async def test_status_reports_progress_while_processing(tmp_path, monkeypatch):
+    monkeypatch.setattr(videos, "OUTPUT_DIR", tmp_path)
+
+    job_id = make_job()
+    reported = asyncio.Event()
+    release = asyncio.Event()
+
+    async def pipeline_with_progress(request, output_path, work_dir, on_progress=None):
+        on_progress(VideoProgress("rendering", 2, 6, 0.52))
+        reported.set()
+        await release.wait()
+
+    with patch("app.api.v1.videos.generate_video", pipeline_with_progress):
+        job_task = asyncio.create_task(run_video_job(job_id, make_request()))
+        await reported.wait()
+
+        status = (await videos.read_video_status(job_id)).model_dump()
+        assert status["status"] == "processing"
+        assert status["progress"] == {"stage": "rendering", "done": 2, "total": 6, "progress": 0.52}
+
+        release.set()
+        await job_task
+
+    # 끝난 작업은 진행 정보를 돌려주지 않는다
+    assert (await videos.read_video_status(job_id)).progress is None

@@ -1,0 +1,89 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: calc(var(--space-8) * -1);
+}
+
+.text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  min-width: 0;
+  font-size: var(--font-size-caption);
+}
+
+.step {
+  flex: none;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.message {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tail {
+  flex: none;
+  margin-left: auto;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.track {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-subtle);
+}
+
+.bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transition: width 0.6s ease;
+}
+
+/* 진행률을 모를 때: 짧은 막대가 왼쪽에서 오른쪽으로 지나간다 */
+.indeterminate .bar {
+  width: 30%;
+  animation: run-progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes run-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
+
+  .indeterminate .bar {
+    width: 100%;
+    opacity: 0.4;
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .text {
+    flex-wrap: wrap;
+  }
+
+  .tail {
+    margin-left: 0;
+  }
+}

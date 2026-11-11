@@ -101,8 +101,9 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
 
     const poll = async () => {
       try {
-        const { status, error } = await getVideoStatus(jobId)
+        const { status, error, progress } = await getVideoStatus(jobId)
         if (stopped) return
+        if (progress) dispatch({ type: 'videoProgress', progress, now: Date.now() })
         if (status === 'failed') {
           failVideo(error?.message ?? '영상 생성에 실패했습니다.')
           return
@@ -186,9 +187,9 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       hook_text: hookText,
     }
 
-    // 실제 백엔드는 음성 생성과 영상 렌더링을 하나의 작업으로 처리
+    // 서버는 한 작업 안에서 음성(4단계) → 영상 합성(5단계)을 이어서 한다. 진행 상황은 상태 조회로 받는다
     const result = await step(
-      5,
+      4,
       '영상 생성 요청 중',
       async () => {
         const missingImage = scenes.findIndex((scene) => !scene.asset_id)
@@ -201,14 +202,14 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       (response) => `영상 생성 요청 접수 · ${response.job_id}`,
     )
 
-    // 202는 작업 접수이므로 완성될 때까지 5단계를 진행 중으로 둔다
+    // 202는 작업 접수이므로 진행 정보를 받을 때까지 4단계를 진행 중으로 둔다
     dispatch({
       type: 'videoQueued',
       jobId: result.job_id,
       now: Date.now(),
     })
   }
-  /** 1단계부터 시작. 검토 모드는 3단계 후 멈추고, 자동 모드는 5단계까지 */
+  /** 1단계부터 시작. 검토 모드는 장면이 나오면(3단계 편집) 멈추고, 자동 모드는 5단계까지 */
   const start = async (input: ContentInput) => {
     const signal = begin()
     const mode = stateRef.current.mode
@@ -222,12 +223,12 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       )
       dispatch({ type: 'content', content })
 
-      // 2~3단계: 대본 생성 + 장면 구성
-      const generated = await step(
+      // 2단계: 대본 생성 + 자막 카드로 변환
+      const { generated, scenes } = await step(
         2,
         '대본과 장면 생성 중',
-        () =>
-          generateScript(
+        async () => {
+          const generated = await generateScript(
             {
               title: content.title,
               // 이미지 자리 표시는 원문 화면용이라 대본 요청에서는 뺀다 (이미지는 images로 따로 보냄)
@@ -239,20 +240,14 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
               target_duration_sec: 45,
             },
             signal,
-          ),
-        (result) => `핵심 포인트 ${result.summary.key_points.length}개`,
+          )
+          return { generated, scenes: toPipelineScenes(generated) }
+        },
+        ({ scenes }) => `장면 ${scenes.length}개 · 약 ${formatSec(estimateSec(scenes))}`,
       )
 
       dispatch({ type: 'summary', summary: generated.summary })
       dispatch({ type: 'hookText', hookText: generated.hook_text })
-
-      const scenes = await step(
-        3,
-        '장면 구성 중',
-        async () => toPipelineScenes(generated),
-        (list) =>
-          `장면 ${list.length}개 · 약 ${formatSec(estimateSec(list))}`,
-      )
 
       dispatch({ type: 'scenes', scenes })
 
@@ -309,6 +304,21 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     cancelVideo(runningJob).catch((error) => onError(errorMessage(error)))
   }
 
+  /**
+   * 영상 작업 진행률(0~1)과 남은 시간(초). 서버가 장면 단위로 알려 주므로,
+   * 마지막으로 받은 시점의 속도로 남은 시간을 구하고 그 뒤로는 시간이 가는 만큼 줄인다.
+   */
+  const videoEta = () => {
+    const info = state.videoProgress
+    const startedAt = state.steps[4].startedAt
+    if (!info || startedAt == null || state.phase !== 'rendering') return null
+    const elapsedAtUpdate = (info.at - startedAt) / 1000
+    // 너무 이른 추정은 크게 흔들리므로 5% 이상 진행된 뒤부터 남은 시간을 보여 준다
+    const remainingSec =
+      info.progress >= 0.05 ? Math.max(1, (elapsedAtUpdate * (1 - info.progress)) / info.progress - (now - info.at) / 1000) : null
+    return { progress: info.progress, remainingSec }
+  }
+
   /** 단계 카드 아래 경과 시간 */
   const stepElapsed = (id: StepId) => {
     const { startedAt, endedAt } = state.steps[id]
@@ -318,5 +328,5 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
 
   const stale = state.result != null && state.renderedWith !== renderKey(state.scenes, state.audio)
 
-  return { state, dispatch, running, now, start, render, cancel, stepElapsed, stale }
+  return { state, dispatch, running, now, start, render, cancel, stepElapsed, videoEta, stale }
 }

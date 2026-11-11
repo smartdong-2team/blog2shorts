@@ -242,3 +242,58 @@ async def test_generate_video_uses_ai_subtitle_pages(monkeypatch, tmp_path):
     cue = mock_render.await_args.args[0].scenes[0].subtitles[0]
     assert cue.text == "테스트\n내레이션"
 
+
+
+@pytest.mark.asyncio
+async def test_generate_video_reports_progress(monkeypatch, tmp_path):
+    asset_id = uuid4()
+    request = VideoCreateRequest(
+        scenes=[
+            {"order": 1, "role": "hook", "narration": "첫 장면", "caption": "첫", "asset_id": asset_id},
+            {"order": 2, "role": "cta", "narration": "둘째 장면", "caption": "둘", "asset_id": asset_id},
+        ]
+    )
+    monkeypatch.setattr(video_pipeline, "get_asset", Mock(return_value=Mock(path=tmp_path / "image.jpg")))
+
+    async def fake_audio(scenes, output_dir, voice, on_scene_done=None):
+        for done in (1, 2):
+            on_scene_done(done, 2)
+        return AudioGenerationResult(
+            scenes=[
+                SceneMedia(
+                    order=order,
+                    asset_id=str(asset_id),
+                    audio=AudioAsset(path="audio.wav", duration_sec=2.0),
+                    subtitles=[SubtitleCue(text="자막", start_sec=0.0, end_sec=2.0)],
+                )
+                for order in (1, 2)
+            ],
+            total_duration_sec=4.0,
+        )
+
+    async def fake_render(render_request, on_scene_done=None):
+        for done in (1, 2):
+            on_scene_done(done, 2)
+
+    monkeypatch.setattr(video_pipeline, "generate_scene_audio", fake_audio)
+    monkeypatch.setattr(video_pipeline, "render_video", fake_render)
+
+    reported = []
+    await video_pipeline.generate_video(
+        request=request,
+        output_path=tmp_path / "output.mp4",
+        work_dir=tmp_path / "work",
+        on_progress=reported.append,
+    )
+
+    assert [(p.stage, p.done, p.total) for p in reported] == [
+        ("tts", 0, 2),
+        ("tts", 1, 2),
+        ("tts", 2, 2),
+        ("rendering", 0, 2),
+        ("rendering", 1, 2),
+        ("finishing", 2, 2),
+    ]
+    progresses = [p.progress for p in reported]
+    assert progresses == sorted(progresses)
+    assert progresses[-1] == pytest.approx(0.95)
