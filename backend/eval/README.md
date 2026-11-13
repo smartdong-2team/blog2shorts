@@ -1,10 +1,10 @@
 # 대본 프롬프트 평가
 
 프롬프트(`app/services/script_prompts.py`)를 고쳤을 때 대본이 실제로 나아졌는지 숫자로 비교하는 도구입니다.
-같은 블로그 글 묶음(`posts.txt`)으로 대본을 여러 번 만들고 아래 두 가지를 모읍니다.
+같은 블로그 글 묶음(`posts.txt`)으로 대본을 여러 번 만들고 아래 두 가지를 모읍니다. 버전끼리는 맞대어 비교합니다(`--pairwise`).
 
 - **규칙 지표:** 검증 통과율, 전체 글자 수, 350자 초과 횟수, 첫 문장 길이, 35자 넘는 문장 비율, 빈말 개수, hook_text 길이
-- **LLM 채점(1~5점):** 항목마다 문제를 먼저 적게 하고, 문제 개수로 점수를 매깁니다.
+- **LLM 채점(1~5점):** 항목마다 문제를 먼저 적게 하고, 문제 개수로 점수를 매깁니다. 어디가 약한지 볼 때 씁니다.
   - `hook_promise`: 첫 문장이 구체적으로 약속하는가, 약속한 걸 실제로 주는가
   - `new_info_per_scene`: 장면마다 원문의 구체적인 정보가 있는가
   - `faithfulness`: 원문에 없는 사실이 없는가
@@ -38,6 +38,18 @@ uv run python scripts/eval_script.py --label baseline
    ```bash
    uv run python scripts/eval_script.py --compare eval/results/<baseline 폴더> eval/results/<새 폴더>
    ```
+
+4. 같은 글로 만든 대본끼리 맞대어 어느 쪽이 나은지 봅니다. **버전 차이는 이 결과로 판단하세요.**
+
+   ```bash
+   uv run python scripts/eval_script.py --pairwise eval/results/<baseline 폴더> eval/results/<새 폴더>
+   ```
+
+   - 같은 글의 1번째 대본끼리, 2번째 대본끼리 짝지어 `gpt-4.1`에 고르게 합니다. 검증에 실패한 대본은 뺍니다.
+   - 순서를 바꿔 두 번 묻고, 두 번 다 이긴 경우만 승으로 셉니다(나머지는 무).
+   - 1~5점 평균은 버전 차이가 작으면 흔들림에 묻힙니다. 2026-11-14 기준 v3와 v6는 평균이 0.07점 차이였지만,
+     맞대 보면 v6가 26승 2패였습니다.
+   - 대본이 길수록 정보가 많아 유리할 수 있으니 `--compare`의 전체 글자 수도 같이 보세요.
 
 채점 기준(`JUDGE_INSTRUCTIONS`)을 바꿨다면 예전 결과와 점수를 바로 비교할 수 없습니다.
 `--rejudge eval/results/<폴더>`로 예전 대본을 새 기준으로 다시 채점한 뒤 비교하세요.

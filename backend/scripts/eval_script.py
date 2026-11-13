@@ -14,6 +14,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -406,6 +407,95 @@ def compare(dirs: list[str]) -> None:
     print(summary_markdown(columns))
 
 
+# --------------------------------------------------
+# 6. 두 결과를 나란히 놓고 어느 쪽이 나은지 고르기
+# 1~5점 채점은 버전 차이가 작으면 흔들림에 묻힌다. 같은 글의 대본 두 개를 직접 비교하면 더 민감하다
+# --------------------------------------------------
+class PairVerdict(BaseModel):
+    reason: str
+    winner: Literal["1", "2", "tie"]
+
+
+PAIRWISE_INSTRUCTIONS = """너는 교육 콘텐츠 숏폼 편집자야.
+같은 블로그 글로 만든 45초 쇼츠 대본 두 개를 보고, 실제로 올릴 하나를 골라.
+
+기준(중요한 순서):
+1. 원문에 없는 사실·숫자·개수를 지어냈으면 크게 진다.
+2. 시청자가 끝까지 보고 나서 바로 써먹을 구체적 정보(숫자, 이름, 방법)가 더 많이 남는 쪽.
+3. 첫 문장이 더 구체적이라 계속 보고 싶어지는 쪽.
+4. 귀로 한 번 듣고 이해되는 쪽. 긴 문장, 빈말('중요해요', '체계적', '알려드릴게요')은 감점.
+
+reason에 두 대본의 차이를 짧게 적고, winner는 '1', '2', 정말 차이가 없을 때만 'tie'로 답해."""
+
+
+async def pick_better(client, post: dict, first: dict, second: dict, model: str) -> str:
+    response = await client.responses.parse(
+        model=model,
+        instructions=PAIRWISE_INSTRUCTIONS,
+        input=[
+            {
+                "role": "user",
+                "content": (
+                    f"# 원문 제목\n{post['title']}\n\n# 원문\n{post['text']}\n\n"
+                    f"# 대본 1\n{format_script(first)}\n\n# 대본 2\n{format_script(second)}"
+                ),
+            }
+        ],
+        text_format=PairVerdict,
+        temperature=0,
+    )
+    parsed = response.output_parsed
+    return parsed.winner if parsed else "tie"
+
+
+async def pairwise(args) -> None:
+    """두 결과 폴더의 대본을 같은 글끼리 짝지어 비교한다. 순서를 바꿔 두 번 묻고 둘 다 이겨야 승."""
+
+    dir_a, dir_b = (Path(d) for d in args.pairwise)
+    by_post: dict[str, list[list[dict]]] = {}
+    for index, directory in enumerate((dir_a, dir_b)):
+        for record in load_records(directory):
+            # 검증에 실패한 대본은 앱에서 버려지므로 비교하지 않는다 (통과율은 --compare로 본다)
+            if record.get("output") and record.get("valid"):
+                by_post.setdefault(record["post"], [[], []])[index].append(record["output"])
+
+    pairs = [
+        (post_id, a, b)
+        for post_id, (outputs_a, outputs_b) in by_post.items()
+        for a, b in zip(outputs_a, outputs_b)
+    ]
+    posts = {
+        post_id: json.loads((CACHE_DIR / f"{post_id}.json").read_text(encoding="utf-8"))
+        for post_id in by_post
+    }
+
+    client = get_openai_client()
+    semaphore = asyncio.Semaphore(args.concurrency)
+
+    async def one(post_id: str, a: dict, b: dict) -> str:
+        async with semaphore:
+            ab, ba = await asyncio.gather(
+                pick_better(client, posts[post_id], a, b, args.judge_model),
+                pick_better(client, posts[post_id], b, a, args.judge_model),
+            )
+        a_votes = (ab == "1") + (ba == "2")
+        b_votes = (ab == "2") + (ba == "1")
+        return "a" if a_votes == 2 else "b" if b_votes == 2 else "tie"
+
+    try:
+        results = await asyncio.gather(*(one(*pair) for pair in pairs))
+    finally:
+        await client.close()
+
+    wins, losses = results.count("b"), results.count("a")
+    ties = results.count("tie")
+    decided = wins + losses
+    print(f"{dir_b.name} vs {dir_a.name}: 짝 {len(results)}개")
+    print(f"- {dir_b.name} 승 {wins} / 무 {ties} / 패 {losses}")
+    if decided:
+        print(f"- 승부가 난 짝 중 {dir_b.name} 승률 {wins / decided:.0%}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="대본 프롬프트 평가")
     parser.add_argument("--posts", default=str(EVAL_DIR / "posts.txt"), help="글 주소 목록 파일")
@@ -420,12 +510,17 @@ def main() -> None:
     parser.add_argument("--refresh", action="store_true", help="저장해 둔 글을 다시 받기")
     parser.add_argument("--compare", nargs="+", metavar="RESULT_DIR", help="결과 폴더 여러 개를 표로 비교")
     parser.add_argument("--rejudge", metavar="RESULT_DIR", help="이 결과 폴더의 대본을 지금 채점 기준으로 다시 채점")
+    parser.add_argument(
+        "--pairwise", nargs=2, metavar=("OLD_DIR", "NEW_DIR"), help="두 결과 폴더의 대본을 같은 글끼리 맞대어 비교"
+    )
     args = parser.parse_args()
 
     if args.compare:
         compare(args.compare)
     elif args.rejudge:
         asyncio.run(rejudge(args))
+    elif args.pairwise:
+        asyncio.run(pairwise(args))
     else:
         asyncio.run(run(args))
 
