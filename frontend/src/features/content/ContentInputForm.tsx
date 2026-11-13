@@ -4,6 +4,7 @@ import { SegmentedControl, type SegmentItem } from '../../components/common/Segm
 import { Tabs, type TabItem } from '../../components/common/Tabs'
 import { TextField } from '../../components/common/TextField'
 import { SAMPLE_URL } from '../pipeline/mockData'
+import type { ScriptStyle } from '../../types/api'
 import type { ContentInput, Mode } from '../pipeline/types'
 import styles from './ContentInputForm.module.css'
 
@@ -17,6 +18,12 @@ const INPUT_TABS: TabItem<InputKind>[] = [
 const MODE_ITEMS: SegmentItem<Mode>[] = [
   { value: 'auto', label: '자동 제작' },
   { value: 'review', label: '검토 후 제작' },
+]
+
+/** 대본 스타일. 정보 전달은 사실을 촘촘히, 숏츠는 질문형 첫 장면과 짧은 리듬 */
+const STYLE_ITEMS: SegmentItem<ScriptStyle>[] = [
+  { value: 'shorts', label: '숏츠' },
+  { value: 'info', label: '정보 전달' },
 ]
 
 const START_LABEL: Record<Mode, string> = {
@@ -43,6 +50,7 @@ export interface ContentInputHandle {
 
 export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: ContentInputFormProps) {
   const [kind, setKind] = useState<InputKind>('url')
+  const [style, setStyle] = useState<ScriptStyle>('shorts')
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -62,7 +70,8 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
     return null
   }
 
-  const begin = () => onStart(kind === 'url' ? { kind: 'url', url: url.trim() } : { kind: 'text', title, text })
+  const begin = () =>
+    onStart(kind === 'url' ? { kind: 'url', url: url.trim(), style } : { kind: 'text', title, text, style })
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -93,13 +102,22 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
     <form className={styles.form} onSubmit={submit} noValidate>
       <div className={styles.toolbar}>
         <Tabs items={INPUT_TABS} value={kind} onChange={changeKind} ariaLabel="입력 방식" />
-        <SegmentedControl
-          items={MODE_ITEMS}
-          value={mode}
-          onChange={onModeChange}
-          ariaLabel="진행 방식"
-          disabled={running}
-        />
+        <div className={styles.options}>
+          <SegmentedControl
+            items={STYLE_ITEMS}
+            value={style}
+            onChange={setStyle}
+            ariaLabel="대본 스타일"
+            disabled={running}
+          />
+          <SegmentedControl
+            items={MODE_ITEMS}
+            value={mode}
+            onChange={onModeChange}
+            ariaLabel="진행 방식"
+            disabled={running}
+          />
+        </div>
       </div>
 
       {kind === 'url' ? (

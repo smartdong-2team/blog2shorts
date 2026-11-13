@@ -1,5 +1,6 @@
 import type { SceneRole } from '../../components/common/RoleBadge'
 import type { StepStatus } from '../../components/common/StepCard'
+import type { ScriptStyle } from '../../types/api'
 
 // 필드 이름은 docs/api-design.md의 응답 형식에 맞춘다 (mockApi를 실제 API로 바꿀 때 그대로 쓰기 위해)
 
@@ -17,7 +18,10 @@ export interface StepState {
   endedAt?: number
 }
 
-export type ContentInput = { kind: 'url'; url: string } | { kind: 'text'; title: string; text: string }
+/** 입력 글과 대본 스타일 */
+export type ContentInput = ({ kind: 'url'; url: string } | { kind: 'text'; title: string; text: string }) & {
+  style: ScriptStyle
+}
 
 export interface ContentImage {
   asset_id: string
