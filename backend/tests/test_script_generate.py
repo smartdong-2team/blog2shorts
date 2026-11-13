@@ -13,7 +13,7 @@ from app.schemas.script import (
     ScriptOutputFormat,
 )
 from app.services import script_generate
-from app.services.script_prompts import SCRIPT_INSTRUCTIONS
+from app.services.script_prompts import SCRIPT_INSTRUCTIONS_BY_STYLE
 from app.services.script_generate import (
     ScriptGenerationError,
     build_user_content,
@@ -286,8 +286,34 @@ async def test_generate_script_asks_ai_for_subtitle_pages():
     assert "subtitle_pages" in instructions
 
 
-def test_script_prompt_includes_each_section():
-    """제목·말투·자막·이미지 지시가 프롬프트에 들어간다."""
+@pytest.mark.parametrize("style", ["info", "shorts"])
+def test_script_prompt_includes_each_section(style):
+    """스타일마다 제목·말투·자막·이미지 지시가 프롬프트에 들어간다."""
 
-    for keyword in ("hook_text", "해요체", "subtitle_pages", "asset_id"):
-        assert keyword in SCRIPT_INSTRUCTIONS
+    for keyword in ("hook_text", "해요체", "subtitle_pages", "asset_id", "key_points"):
+        assert keyword in SCRIPT_INSTRUCTIONS_BY_STYLE[style]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", ["info", "shorts"])
+async def test_generate_script_uses_prompt_for_style(style):
+    """요청한 스타일의 프롬프트로 대본을 만든다."""
+
+    client = mock_client(make_output([None, None, None, None]))
+    request = make_request([]).model_copy(update={"style": style})
+
+    with patch.object(script_generate, "get_openai_client", return_value=client):
+        await generate_script(request)
+
+    instructions = client.responses.parse.await_args.kwargs["instructions"]
+
+    assert instructions == SCRIPT_INSTRUCTIONS_BY_STYLE[style]
+
+
+def test_script_style_defaults_to_shorts():
+    assert make_request([]).style == "shorts"
+
+
+def test_script_style_rejects_unknown_value():
+    with pytest.raises(ValueError):
+        ScriptGenerateRequest(title="제목", text=BODY, style="drama")

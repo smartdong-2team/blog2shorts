@@ -23,6 +23,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.services.script_prompts import DEFAULT_STYLE, ScriptStyle
+
 
 # --------------------------------------------------
 # 1. 요청(Request) 스키마
@@ -68,6 +70,10 @@ class ScriptGenerateRequest(BaseModel):
         ge=30,
         le=60,
         description="목표 영상 길이(초). 기본값 45초",
+    )
+    style: ScriptStyle = Field(
+        default=DEFAULT_STYLE,
+        description="대본 스타일. info: 정보 전달, shorts: 숏츠(질문형 첫 장면)",
     )
 
 

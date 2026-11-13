@@ -19,7 +19,7 @@ from app.schemas.script import (
     ScriptGenerateRequest,
     ScriptGenerateResponse,
 )
-from app.services.script_prompts import SCRIPT_INSTRUCTIONS
+from app.services.script_prompts import SCRIPT_INSTRUCTIONS_BY_STYLE
 from app.services.storage import get_asset
 from app.services.subtitles import clean_subtitle_pages, split_into_pages
 
@@ -268,7 +268,7 @@ async def generate_script(
                 # 1. OpenAI 대본 생성
                 response = await client.responses.parse(
                     model=get_settings().openai_script_model,
-                    instructions=SCRIPT_INSTRUCTIONS,
+                    instructions=SCRIPT_INSTRUCTIONS_BY_STYLE[request.style],
                     input=[{"role": "user", "content": user_content}],
                     text_format=ScriptOutputFormat,
                 )

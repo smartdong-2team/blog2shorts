@@ -118,7 +118,8 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
   "title": "인디자인독학 실무자들은 이렇게 공부해요",
   "text": "본문 텍스트 (200~20,000자)",
   "images": [ { "asset_id": "5b8e…", "alt": null } ],
-  "target_duration_sec": 45
+  "target_duration_sec": 45,
+  "style": "shorts"
 }
 ```
 
@@ -128,6 +129,7 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
 | `text` | 필수, 200~20,000자 (설정값) |
 | `images` | 선택, 최대 20개. 직접 입력 시 빈 배열 |
 | `target_duration_sec` | 선택, 30~60, 기본 45 |
+| `style` | 선택, `shorts`(숏츠: 질문형 첫 장면) 또는 `info`(정보 전달: 첫 문장부터 숫자·이름), 기본 `shorts` |
 
 - Response `200`
 
