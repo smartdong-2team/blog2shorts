@@ -9,10 +9,7 @@
 고친 뒤에는 eval/README.md의 평가 스크립트로 이전 프롬프트와 비교한다.
 """
 
-from typing import Literal
-
-ScriptStyle = Literal["info", "shorts"]
-DEFAULT_STYLE: ScriptStyle = "shorts"
+from app.schemas.script import DEFAULT_STYLE, ScriptStyle
 
 # --------------------------------------------------
 # 공통

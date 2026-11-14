@@ -23,7 +23,10 @@ from pydantic import (
     model_validator,
 )
 
-from app.services.script_prompts import DEFAULT_STYLE, ScriptStyle
+
+# 대본 스타일. info: 정보 전달, shorts: 숏츠(질문형 첫 장면). 스타일별 프롬프트는 services/script_prompts.py
+ScriptStyle = Literal["info", "shorts"]
+DEFAULT_STYLE: ScriptStyle = "shorts"
 
 
 # --------------------------------------------------
