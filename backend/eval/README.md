@@ -23,6 +23,9 @@ uv run python scripts/eval_script.py --label baseline
 - 기본값: 글 17개 × 3번, 대본 모델은 `.env` 설정(`gpt-4.1-mini`), 채점 모델은 `gpt-4.1`
 - 글은 처음 한 번 받아 `eval/cache/`에 저장하고, 결과는 `eval/results/<시각>-<이름>/`에 남깁니다. 둘 다 git에 올리지 않습니다.
 - 비용: 기본 설정 한 번에 1~2달러 정도입니다. 빨리 볼 때는 `--limit 3 --runs 1`, 채점을 빼려면 `--no-judge`
+- OpenAI 크레딧 없이 돌리려면 `--provider nvidia`를 붙입니다. 환경 변수 `NVIDIA_API_KEY`가 필요하고,
+  생성과 채점 모두 NVIDIA 무료 모델(Nemotron)을 씁니다. 앱이 쓰는 모델과 다르므로 **프롬프트끼리 비교할 때만** 쓰고,
+  OpenAI로 만든 결과와 섞어 비교하지 마세요.
 
 ## 프롬프트 비교
 

@@ -35,6 +35,62 @@ from app.services.script_generate import (  # noqa: E402
 )
 from app.services.script_prompts import SCRIPT_INSTRUCTIONS  # noqa: E402
 
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+NVIDIA_DEFAULT_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+
+
+class _ChatParse:
+    """responses.parse와 같은 모양으로 Chat Completions(JSON 스키마)를 부른다."""
+
+    def __init__(self, client):
+        self._client = client
+
+    async def parse(self, *, model, instructions, input, text_format, temperature=0.2):
+        user = input[0]["content"]
+        if isinstance(user, list):  # Responses 형식의 input_text 조각만 이어 붙인다 (평가는 이미지를 안 보냄)
+            user = "\n\n".join(part["text"] for part in user if part.get("type") == "input_text")
+        response = await self._client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": instructions}, {"role": "user", "content": user}],
+            temperature=temperature,
+            max_tokens=4000,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": text_format.__name__, "schema": text_format.model_json_schema()},
+            },
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        )
+        raw = response.choices[0].message.content or ""
+        match = re.search(r"\{.*\}", raw, re.S)
+        try:
+            parsed = text_format.model_validate_json(match.group(0)) if match else None
+        except ValidationError:
+            parsed = None
+        return type("Parsed", (), {"output_parsed": parsed})()
+
+
+class NvidiaClient:
+    """평가용 NVIDIA 클라이언트. OpenAI 크레딧 없이 프롬프트끼리 비교할 때 쓴다 (NVIDIA_API_KEY 필요)."""
+
+    def __init__(self):
+        import os
+
+        from openai import AsyncOpenAI
+
+        key = os.getenv("NVIDIA_API_KEY")
+        if not key:
+            raise SystemExit("NVIDIA_API_KEY 환경 변수가 없습니다.")
+        self._client = AsyncOpenAI(base_url=NVIDIA_BASE_URL, api_key=key, max_retries=2, timeout=120)
+        self.responses = _ChatParse(self._client)
+
+    async def close(self):
+        await self._client.close()
+
+
+def make_client(args):
+    return NvidiaClient() if args.provider == "nvidia" else get_openai_client()
+
+
 EVAL_DIR = BACKEND_DIR / "eval"
 CACHE_DIR = EVAL_DIR / "cache"
 RESULTS_DIR = EVAL_DIR / "results"
@@ -342,7 +398,7 @@ async def run(args) -> None:
     (out_dir / "instructions.txt").write_text(instructions, encoding="utf-8")
 
     print(f"대본 {len(posts) * args.runs}개 생성 (모델 {args.model}, 채점 {'끔' if args.no_judge else args.judge_model})")
-    client = get_openai_client()
+    client = make_client(args)
     semaphore = asyncio.Semaphore(args.concurrency)
     try:
         records = await asyncio.gather(
@@ -374,7 +430,7 @@ async def rejudge(args) -> None:
         for record in records
     }
 
-    client = get_openai_client()
+    client = make_client(args)
     semaphore = asyncio.Semaphore(args.concurrency)
 
     async def one(record: dict) -> dict:
@@ -469,7 +525,7 @@ async def pairwise(args) -> None:
         for post_id in by_post
     }
 
-    client = get_openai_client()
+    client = make_client(args)
     semaphore = asyncio.Semaphore(args.concurrency)
 
     async def one(post_id: str, a: dict, b: dict) -> str:
@@ -503,8 +559,11 @@ def main() -> None:
     parser.add_argument("--label", help="결과 폴더 이름에 붙일 이름")
     parser.add_argument("--runs", type=int, default=3, help="글 하나당 생성 횟수")
     parser.add_argument("--limit", type=int, default=0, help="앞에서부터 글 N개만")
-    parser.add_argument("--model", default=get_settings().openai_script_model, help="대본 모델")
-    parser.add_argument("--judge-model", default="gpt-4.1", help="채점 모델")
+    parser.add_argument(
+        "--provider", choices=["openai", "nvidia"], default="openai", help="nvidia면 NVIDIA 무료 API로 생성·채점"
+    )
+    parser.add_argument("--model", help="대본 모델. 기본: openai는 .env 설정, nvidia는 Nemotron")
+    parser.add_argument("--judge-model", help="채점 모델. 기본: openai는 gpt-4.1, nvidia는 Nemotron")
     parser.add_argument("--no-judge", action="store_true", help="LLM 채점 생략 (규칙 지표만)")
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--refresh", action="store_true", help="저장해 둔 글을 다시 받기")
@@ -514,6 +573,9 @@ def main() -> None:
         "--pairwise", nargs=2, metavar=("OLD_DIR", "NEW_DIR"), help="두 결과 폴더의 대본을 같은 글끼리 맞대어 비교"
     )
     args = parser.parse_args()
+    nvidia = args.provider == "nvidia"
+    args.model = args.model or (NVIDIA_DEFAULT_MODEL if nvidia else get_settings().openai_script_model)
+    args.judge_model = args.judge_model or (NVIDIA_DEFAULT_MODEL if nvidia else "gpt-4.1")
 
     if args.compare:
         compare(args.compare)
