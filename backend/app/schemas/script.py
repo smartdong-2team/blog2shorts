@@ -198,7 +198,7 @@ class ScriptAIOutput(BaseModel):
         if not 150 <= total_length <= 350:
             raise ValueError(
                 "Total narration length "
-                "must be between 150 and 350"
+                f"must be between 150 and 350, got {total_length}"
             )
 
         return self

@@ -317,3 +317,83 @@ def test_script_style_defaults_to_shorts():
 def test_script_style_rejects_unknown_value():
     with pytest.raises(ValueError):
         ScriptGenerateRequest(title="제목", text=BODY, style="drama")
+
+
+# 5. 검증 실패 이유와 재시도 (#15)
+def make_long_output() -> ScriptOutputFormat:
+    """장면 6개 × 66자 = 396자로 전체 350자를 넘는 대본."""
+
+    output = make_output([None] * 6)
+
+    for scene in output.scenes:
+        scene.narration = "가" * 66
+
+    return output
+
+
+def test_describe_failure_reports_rule_and_total_length():
+    with pytest.raises(script_generate.ValidationError) as error:
+        script_generate.ScriptAIOutput.model_validate(
+            make_long_output().model_dump()
+        )
+
+    reason = script_generate.describe_failure(error.value)
+
+    assert "between 150 and 350" in reason
+    assert "got 396" in reason
+
+
+def test_describe_failure_reports_scene_length():
+    output = make_output([None] * 4).model_dump()
+    output["scenes"][1]["narration"] = "가" * 130
+
+    with pytest.raises(script_generate.ValidationError) as error:
+        script_generate.ScriptAIOutput.model_validate(output)
+
+    reason = script_generate.describe_failure(error.value)
+
+    assert "scenes.1.narration" in reason
+    assert "got 130" in reason
+    assert "가가가" not in reason
+
+
+@pytest.mark.asyncio
+async def test_generate_script_retries_with_failure_reason(caplog):
+    client = mock_client(make_long_output(), make_output([None] * 4))
+
+    with (
+        patch.object(script_generate, "get_openai_client", return_value=client),
+        caplog.at_level("WARNING", logger=script_generate.__name__),
+    ):
+        result = await generate_script(make_request([]))
+
+    assert len(result.scenes) == 4
+
+    first_input = client.responses.parse.await_args_list[0].kwargs["input"]
+    retry_input = client.responses.parse.await_args_list[1].kwargs["input"]
+
+    assert len(first_input) == 1
+    assert [message["role"] for message in retry_input] == [
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert retry_input[0] == first_input[0]
+    assert "가" * 66 in retry_input[1]["content"]
+    assert "got 396" in retry_input[2]["content"]
+    assert "got 396" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_generate_script_retries_same_request_after_api_error():
+    client = mock_client(make_output([None] * 4))
+    client.responses.parse.side_effect = [
+        script_generate.APITimeoutError(request=Mock()),
+        SimpleNamespace(output_parsed=make_output([None] * 4)),
+    ]
+
+    with patch.object(script_generate, "get_openai_client", return_value=client):
+        await generate_script(make_request([]))
+
+    calls = client.responses.parse.await_args_list
+    assert calls[0].kwargs["input"] == calls[1].kwargs["input"]

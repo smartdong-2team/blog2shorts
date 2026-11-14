@@ -3,6 +3,7 @@
 
 import asyncio
 import base64
+import json
 import logging
 import re
 from io import BytesIO
@@ -100,6 +101,54 @@ def normalize_subtitle_pages(
         return split_into_pages(narration)
 
     return cleaned
+
+
+def describe_failure(error: Exception) -> str:
+    """검증 실패 이유를 규칙과 실제 값으로 요약한다. 로그와 재시도 요청에 쓴다.
+
+    대본 내용은 넣지 않고 위치, 규칙, 길이만 남긴다.
+    """
+
+    if not isinstance(error, ValidationError):
+        return str(error)
+
+    reasons = []
+
+    for detail in error.errors():
+        location = ".".join(str(part) for part in detail["loc"]) or "script"
+        reason = f"{location}: {detail['msg']}"
+
+        if detail["type"] in ("string_too_long", "string_too_short") and isinstance(
+            detail.get("input"), str
+        ):
+            reason += f" (got {len(detail['input'])})"
+
+        reasons.append(reason)
+
+    return "; ".join(reasons)
+
+
+def build_retry_messages(
+    user_message: dict,
+    output: dict,
+    reason: str,
+) -> list[dict]:
+    """실패한 대본과 실패 이유를 붙여 다시 요청할 메시지를 만든다."""
+
+    return [
+        user_message,
+        {
+            "role": "assistant",
+            "content": json.dumps(output, ensure_ascii=False),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"방금 만든 대본이 검증에 실패했어: {reason}\n"
+                "이 문제를 고치고, 나머지 규칙도 지켜서 대본 전체를 다시 만들어."
+            ),
+        },
+    ]
 
 
 def normalize_ai_output(ai_output: ScriptOutputFormat) -> dict:
@@ -261,15 +310,20 @@ async def generate_script(
     client = get_openai_client()
 
     user_content = await build_user_content(request)
+    user_message = {"role": "user", "content": user_content}
+    messages = [user_message]
 
     try:
         for attempt in range(MAX_ATTEMPTS):
+            is_last = attempt == MAX_ATTEMPTS - 1
+            output = None
+
             try:
                 # 1. OpenAI 대본 생성
                 response = await client.responses.parse(
                     model=get_settings().openai_script_model,
                     instructions=SCRIPT_INSTRUCTIONS_BY_STYLE[request.style],
-                    input=[{"role": "user", "content": user_content}],
+                    input=messages,
                     text_format=ScriptOutputFormat,
                 )
 
@@ -297,21 +351,37 @@ async def generate_script(
                     estimated_duration_sec=estimated_duration_sec,
                 )
 
+            except (ValidationError, ValueError) as error:
+                reason = describe_failure(error)
+                logger.warning(
+                    "대본 검증 실패 (%d/%d): %s",
+                    attempt + 1,
+                    MAX_ATTEMPTS,
+                    reason,
+                )
+
+                if is_last:
+                    raise ScriptGenerationError(
+                        "대본 생성 및 검증에 실패했습니다."
+                    ) from error
+
+                # 다음 요청에 실패한 대본과 이유를 붙여 고치게 한다 (#15)
+                if output is not None:
+                    messages = build_retry_messages(user_message, output, reason)
+
             except (
-                ValidationError,
-                ValueError,
                 APIConnectionError,
                 APITimeoutError,
                 InternalServerError,
             ) as error:
                 logger.warning(
-                    "대본 생성 실패 (%d/%d): %s",
+                    "대본 생성 요청 실패 (%d/%d): %s",
                     attempt + 1,
                     MAX_ATTEMPTS,
                     type(error).__name__,
                 )
 
-                if attempt == MAX_ATTEMPTS - 1:
+                if is_last:
                     raise ScriptGenerationError(
                         "대본 생성 및 검증에 실패했습니다."
                     ) from error
