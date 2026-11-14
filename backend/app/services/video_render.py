@@ -288,21 +288,37 @@ def build_hook_filter(hook_text: str) -> str:
     pad = HOOK_HIGHLIGHT["padding"]
 
     # *로 감싼 부분은 노란 배경 상자에 어두운 글자로, 나머지는 흰 글자에 검은 테두리로 그린다.
-    # 조각마다 따로 그리므로 폭을 재서 줄 전체를 가운데 맞춘다
+    # 조각마다 따로 그리므로 폭을 재서 줄 전체를 가운데 맞춘다.
+    # drawtext는 조각 앞뒤 공백을 그리지 않으므로, 공백은 글자에서 빼고 그 폭만큼 직접 띄운다
+    scale = fontsize / base_size
+    space = text_width(" ") * scale
+
     for index, segments in enumerate(emphasis_segments(lines)):
         y = start_y + index * line_height
-        widths = [
-            text_width(text) * fontsize / base_size + (pad * 2 if emphasized else 0)
-            for text, emphasized in segments
-        ]
+        pieces = []
+
+        for text, emphasized in segments:
+            core = text.strip()
+            lead = (len(text) - len(text.lstrip())) * space
+            trail = (len(text) - len(text.rstrip())) * space
+            core_width = text_width(core) * scale + (pad * 2 if emphasized and core else 0)
+            pieces.append((core, emphasized, lead, core_width, trail))
+
+        total = sum(lead + core_width + trail for _, _, lead, core_width, trail in pieces)
         offset = 0.0
 
-        for (text, emphasized), width in zip(segments, widths):
-            x = f"(w-{sum(widths):.1f})/2+{offset + (pad if emphasized else 0):.1f}"
+        for core, emphasized, lead, core_width, trail in pieces:
+            offset += lead
+            if not core:
+                offset += core_width + trail
+                continue
+
+            x = f"(w-{total:.1f})/2+{offset + (pad if emphasized else 0):.1f}"
+            width = core_width + trail
             drawtext = (
                 "drawtext="
                 f"fontfile='{font}':"
-                f"text='{escape_drawtext_value(text)}':"
+                f"text='{escape_drawtext_value(core)}':"
                 "expansion=none:"
                 f"fontsize={fontsize}:"
                 f"x={x}:"
