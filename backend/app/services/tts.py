@@ -34,6 +34,9 @@ SUPERTONIC_VOICES = {
 
 DEFAULT_VOICE = "edge_injoon"
 
+# Supertonic의 기본 speed 값. 설정 속도(tts_speed)를 여기에 곱한다
+SUPERTONIC_BASE_SPEED = 1.05
+
 _supertonic_model = None
 _supertonic_lock = threading.Lock()
 
@@ -75,6 +78,7 @@ async def generate_speech(
             voice=voice,
             input=narration,
             response_format="wav",
+            speed=get_settings().tts_speed,
         ) as response:
             await response.stream_to_file(output_path)
 
@@ -110,7 +114,8 @@ async def generate_edge_speech(
     mp3_path = output_path.with_suffix(".mp3")
 
     try:
-        await edge_tts.Communicate(narration, edge_voice).save(str(mp3_path))
+        rate = f"{round((get_settings().tts_speed - 1) * 100):+d}%"
+        await edge_tts.Communicate(narration, edge_voice, rate=rate).save(str(mp3_path))
         await run_ffmpeg(
             [
                 FFMPEG_BIN, "-y", "-i", str(mp3_path),
@@ -143,7 +148,12 @@ def _synthesize_supertonic(narration: str, output_path: Path, style_name: str) -
             _supertonic_model = TTS(model=get_settings().supertonic_model, auto_download=True)
 
         style = _supertonic_model.get_voice_style(voice_name=style_name)
-        wav, _ = _supertonic_model.synthesize(narration, voice_style=style, lang="ko")
+        wav, _ = _supertonic_model.synthesize(
+            narration,
+            voice_style=style,
+            lang="ko",
+            speed=SUPERTONIC_BASE_SPEED * get_settings().tts_speed,
+        )
         _supertonic_model.save_audio(wav, str(output_path))
 
 

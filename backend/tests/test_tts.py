@@ -99,6 +99,7 @@ async def test_generate_speech_success(tmp_path):
         voice="alloy",
         input="안녕하세요. 테스트입니다.",
         response_format="wav",
+        speed=1.15,
     )
 
     client.close.assert_awaited_once()
@@ -215,8 +216,8 @@ async def test_generate_speech_uses_edge_for_edge_voice(tmp_path):
     saved = {}
 
     class FakeCommunicate:
-        def __init__(self, text, voice):
-            saved.update(text=text, voice=voice)
+        def __init__(self, text, voice, rate):
+            saved.update(text=text, voice=voice, rate=rate)
 
         async def save(self, path):
             Path(path).write_bytes(b"mp3")
@@ -233,7 +234,7 @@ async def test_generate_speech_uses_edge_for_edge_voice(tmp_path):
     ):
         result = await generate_speech("안녕하세요", tmp_path, voice="edge_injoon")
 
-    assert saved == {"text": "안녕하세요", "voice": "ko-KR-InJoonNeural"}
+    assert saved == {"text": "안녕하세요", "voice": "ko-KR-InJoonNeural", "rate": "+15%"}
     assert result.duration_sec == pytest.approx(1.5)
     openai_client.assert_not_called()
     # 중간 MP3는 지운다
@@ -256,7 +257,7 @@ async def test_edge_failure_raises_tts_error(tmp_path):
     from app.services import tts
 
     class BrokenCommunicate:
-        def __init__(self, text, voice):
+        def __init__(self, text, voice, rate):
             pass
 
         async def save(self, path):
@@ -282,8 +283,8 @@ class FakeSupertonicTTS:
     def get_voice_style(self, voice_name):
         return voice_name
 
-    def synthesize(self, text, voice_style, lang):
-        self.last = (text, voice_style, lang)
+    def synthesize(self, text, voice_style, lang, speed):
+        self.last = (text, voice_style, lang, round(speed, 4))
         return "wav", [1.0]
 
     def save_audio(self, wav, output_path):
@@ -308,7 +309,7 @@ async def test_generate_speech_uses_supertonic_and_loads_model_once(tmp_path):
     assert first.duration_sec == pytest.approx(1.0)
     assert FakeSupertonicTTS.loads == 1
     assert model.model == "supertonic-2"
-    assert model.last == ("다음 장면", "M1", "ko")
+    assert model.last == ("다음 장면", "M1", "ko", round(1.05 * 1.15, 4))
     openai_client.assert_not_called()
 
 
@@ -317,7 +318,7 @@ async def test_supertonic_failure_raises_tts_error(tmp_path):
     from app.services import tts
 
     class BrokenTTS(FakeSupertonicTTS):
-        def synthesize(self, text, voice_style, lang):
+        def synthesize(self, text, voice_style, lang, speed):
             raise RuntimeError("모델 오류")
 
     with (

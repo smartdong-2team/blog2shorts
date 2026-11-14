@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     # Supertonic 로컬 음성 모델 (supertonic-2: 빠름, supertonic-3: 31개 언어)
     supertonic_model: str = "supertonic-2"
+
+    # 목소리 빠르기. 1.0이 각 음성의 기본 속도, 1.15면 15% 빠르게 (모든 목소리 공통)
+    tts_speed: float = Field(default=1.15, ge=0.5, le=2.0)
 
     naver_blog_ids: list[str] = ["copper567"]
     storage_dir: Path = BACKEND_DIR / "storage"
