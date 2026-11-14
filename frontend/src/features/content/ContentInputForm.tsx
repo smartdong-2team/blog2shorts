@@ -1,5 +1,6 @@
 import { useId, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from 'react'
 import { Button } from '../../components/common/Button'
+import { RadioGroup, type RadioItem } from '../../components/common/RadioGroup'
 import { SegmentedControl, type SegmentItem } from '../../components/common/SegmentedControl'
 import { Tabs, type TabItem } from '../../components/common/Tabs'
 import { TextField } from '../../components/common/TextField'
@@ -20,10 +21,10 @@ const MODE_ITEMS: SegmentItem<Mode>[] = [
   { value: 'review', label: '검토 후 제작' },
 ]
 
-/** 대본 스타일. 정보 전달은 사실을 촘촘히, 숏츠는 질문형 첫 장면과 짧은 리듬 */
-const STYLE_ITEMS: SegmentItem<ScriptStyle>[] = [
-  { value: 'shorts', label: '숏츠' },
-  { value: 'info', label: '정보 전달' },
+/** 대본 스타일. 숏츠는 질문형 첫 장면과 짧은 리듬, 정보 전달은 원문의 숫자·사실을 촘촘히 */
+const STYLE_ITEMS: RadioItem<ScriptStyle>[] = [
+  { value: 'shorts', label: '숏츠', description: '질문으로 시작, 빠른 리듬' },
+  { value: 'info', label: '정보 전달', description: '숫자·사실 위주' },
 ]
 
 const START_LABEL: Record<Mode, string> = {
@@ -98,26 +99,21 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
     setError(null)
   }
 
+  const styleField = (
+    <RadioGroup label="대본 스타일" items={STYLE_ITEMS} value={style} onChange={setStyle} disabled={running} />
+  )
+
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
       <div className={styles.toolbar}>
         <Tabs items={INPUT_TABS} value={kind} onChange={changeKind} ariaLabel="입력 방식" />
-        <div className={styles.options}>
-          <SegmentedControl
-            items={STYLE_ITEMS}
-            value={style}
-            onChange={setStyle}
-            ariaLabel="대본 스타일"
-            disabled={running}
-          />
-          <SegmentedControl
-            items={MODE_ITEMS}
-            value={mode}
-            onChange={onModeChange}
-            ariaLabel="진행 방식"
-            disabled={running}
-          />
-        </div>
+        <SegmentedControl
+          items={MODE_ITEMS}
+          value={mode}
+          onChange={onModeChange}
+          ariaLabel="진행 방식"
+          disabled={running}
+        />
       </div>
 
       {kind === 'url' ? (
@@ -174,6 +170,7 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
               {error}
             </p>
           )}
+          {styleField}
         </div>
       ) : (
         <div className={styles.textFields}>
@@ -195,6 +192,7 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
             disabled={running}
           />
           <div className={styles.textSubmit}>
+            {styleField}
             <Button type="submit" className={styles.submit} disabled={running}>
               {START_LABEL[mode]}
             </Button>
