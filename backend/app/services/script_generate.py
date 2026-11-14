@@ -13,6 +13,7 @@ from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 from openai import APIConnectionError, APITimeoutError, InternalServerError
 from app.core.config import get_settings
+from app.core.nvidia import get_nvidia_client
 from app.core.openai import get_openai_client
 from app.schemas.script import (
     ScriptAIOutput,
@@ -52,6 +53,17 @@ SENTENCE_END = r"(?=[.!?…,\"'\s]|$)"
 
 class ScriptGenerationError(Exception):
     """대본 생성에 최종적으로 실패한 경우."""
+
+
+def get_script_client():
+    """설정(SCRIPT_PROVIDER)에 따라 대본 생성 클라이언트와 모델을 고른다."""
+
+    settings = get_settings()
+
+    if settings.script_provider == "nvidia":
+        return get_nvidia_client(), settings.nvidia_script_model
+
+    return get_openai_client(), settings.openai_script_model
 
 
 def _has_final_consonant(char: str) -> bool:
@@ -307,7 +319,7 @@ async def generate_script(
 ) -> ScriptGenerateResponse:
     """숏폼 대본을 생성하고 검증한 뒤 최종 응답을 반환한다."""
 
-    client = get_openai_client()
+    client, model = get_script_client()
 
     user_content = await build_user_content(request)
     user_message = {"role": "user", "content": user_content}
@@ -321,7 +333,7 @@ async def generate_script(
             try:
                 # 1. OpenAI 대본 생성
                 response = await client.responses.parse(
-                    model=get_settings().openai_script_model,
+                    model=model,
                     instructions=SCRIPT_INSTRUCTIONS_BY_STYLE[request.style],
                     input=messages,
                     text_format=ScriptOutputFormat,
