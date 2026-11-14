@@ -33,6 +33,8 @@ Voice = Literal[
     "edge_injoon",
     "edge_sunhi",
     "edge_hyunsu",
+    "supertonic_male",
+    "supertonic_female",
     "calm_female",
     "bright_female",
     "clear_male",

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     openai_script_model: str = "gpt-4.1-mini"
     openai_tts_model: str = "tts-1"
+
+    # Supertonic 로컬 음성 모델 (supertonic-2: 빠름, supertonic-3: 31개 언어)
+    supertonic_model: str = "supertonic-2"
+
     naver_blog_ids: list[str] = ["copper567"]
     storage_dir: Path = BACKEND_DIR / "storage"
 

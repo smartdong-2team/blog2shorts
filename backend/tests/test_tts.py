@@ -267,3 +267,64 @@ async def test_edge_failure_raises_tts_error(tmp_path):
             await tts.generate_speech("안녕하세요", tmp_path, voice="edge_sunhi")
 
     assert list(tmp_path.iterdir()) == []
+
+
+# --------------------------------------------------
+# Supertonic 로컬 음성
+# --------------------------------------------------
+class FakeSupertonicTTS:
+    loads = 0
+
+    def __init__(self, model, auto_download):
+        FakeSupertonicTTS.loads += 1
+        self.model = model
+
+    def get_voice_style(self, voice_name):
+        return voice_name
+
+    def synthesize(self, text, voice_style, lang):
+        self.last = (text, voice_style, lang)
+        return "wav", [1.0]
+
+    def save_audio(self, wav, output_path):
+        create_test_wav(Path(output_path), duration_sec=1.0)
+
+
+@pytest.mark.asyncio
+async def test_generate_speech_uses_supertonic_and_loads_model_once(tmp_path):
+    from app.services import tts
+
+    FakeSupertonicTTS.loads = 0
+
+    with (
+        patch.dict("sys.modules", {"supertonic": MagicMock(TTS=FakeSupertonicTTS)}),
+        patch.object(tts, "_supertonic_model", None),
+        patch.object(tts, "get_openai_client") as openai_client,
+    ):
+        first = await generate_speech("안녕하세요", tmp_path, voice="supertonic_female")
+        await generate_speech("다음 장면", tmp_path, voice="supertonic_male")
+        model = tts._supertonic_model
+
+    assert first.duration_sec == pytest.approx(1.0)
+    assert FakeSupertonicTTS.loads == 1
+    assert model.model == "supertonic-2"
+    assert model.last == ("다음 장면", "M1", "ko")
+    openai_client.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_supertonic_failure_raises_tts_error(tmp_path):
+    from app.services import tts
+
+    class BrokenTTS(FakeSupertonicTTS):
+        def synthesize(self, text, voice_style, lang):
+            raise RuntimeError("모델 오류")
+
+    with (
+        patch.dict("sys.modules", {"supertonic": MagicMock(TTS=BrokenTTS)}),
+        patch.object(tts, "_supertonic_model", None),
+    ):
+        with pytest.raises(TTSGenerationError):
+            await generate_speech("안녕하세요", tmp_path, voice="supertonic_male")
+
+    assert list(tmp_path.iterdir()) == []

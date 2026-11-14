@@ -1,10 +1,12 @@
 import type { AudioSettings } from '../pipeline/types'
 
-// edge_*는 무료 Edge 음성, 나머지는 OpenAI 음성(크레딧 필요)
+// edge_*는 무료 Edge 음성, supertonic_*은 서버에서 도는 로컬 음성, 나머지는 OpenAI 음성(크레딧 필요)
 export const VOICE_OPTIONS = [
   { value: 'edge_injoon', label: '인준 (남성)' },
   { value: 'edge_sunhi', label: '선희 (여성)' },
   { value: 'edge_hyunsu', label: '현수 (남성)' },
+  { value: 'supertonic_male', label: '로컬 남성 (Supertonic)' },
+  { value: 'supertonic_female', label: '로컬 여성 (Supertonic)' },
   { value: 'calm_female', label: '차분한 여성 (OpenAI)' },
   { value: 'bright_female', label: '밝은 여성 (OpenAI)' },
   { value: 'clear_male', label: '또렷한 남성 (OpenAI)' },

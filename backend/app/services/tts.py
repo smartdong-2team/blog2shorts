@@ -1,5 +1,6 @@
 
 import asyncio
+import threading
 import wave
 from pathlib import Path
 from uuid import uuid4
@@ -24,7 +25,17 @@ EDGE_VOICES = {
     "edge_hyunsu": "ko-KR-HyunsuMultilingualNeural",
 }
 
+# 화면의 목소리 선택값 → Supertonic 로컬 음성 (키·비용 없음, 처음 쓸 때 모델을 내려받음)
+# 모델: OpenRAIL-M. 공식 저장소는 보관(개발 종료) 상태다
+SUPERTONIC_VOICES = {
+    "supertonic_male": "M1",
+    "supertonic_female": "F1",
+}
+
 DEFAULT_VOICE = "edge_injoon"
+
+_supertonic_model = None
+_supertonic_lock = threading.Lock()
 
 
 class TTSGenerationError(Exception):
@@ -51,6 +62,9 @@ async def generate_speech(
 
     if voice in EDGE_VOICES:
         return await generate_edge_speech(narration, output_path, EDGE_VOICES[voice])
+
+    if voice in SUPERTONIC_VOICES:
+        return await generate_supertonic_speech(narration, output_path, SUPERTONIC_VOICES[voice])
 
     voice = OPENAI_VOICES.get(voice, voice)
     client = get_openai_client()
@@ -115,6 +129,39 @@ async def generate_edge_speech(
 
     finally:
         mp3_path.unlink(missing_ok=True)
+
+
+def _synthesize_supertonic(narration: str, output_path: Path, style_name: str) -> None:
+    """Supertonic으로 WAV를 만든다. 모델은 한 번만 불러 쓰고, 동시에 한 장면씩만 합성한다."""
+
+    global _supertonic_model
+
+    with _supertonic_lock:
+        if _supertonic_model is None:
+            from supertonic import TTS
+
+            _supertonic_model = TTS(model=get_settings().supertonic_model, auto_download=True)
+
+        style = _supertonic_model.get_voice_style(voice_name=style_name)
+        wav, _ = _supertonic_model.synthesize(narration, voice_style=style, lang="ko")
+        _supertonic_model.save_audio(wav, str(output_path))
+
+
+async def generate_supertonic_speech(
+    narration: str,
+    output_path: Path,
+    style_name: str,
+) -> AudioAsset:
+    """Supertonic 로컬 모델로 WAV(44.1kHz 모노)를 만든다."""
+
+    try:
+        await asyncio.to_thread(_synthesize_supertonic, narration, output_path, style_name)
+        duration_sec = await asyncio.to_thread(get_wav_duration, output_path)
+        return AudioAsset(path=str(output_path), duration_sec=duration_sec)
+
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        raise TTSGenerationError("Supertonic 음성 생성에 실패했습니다.") from exc
 
 
 # --------------------------------------------------
