@@ -37,6 +37,9 @@ DEFAULT_VOICE = "edge_injoon"
 # Supertonic의 기본 speed 값. 설정 속도(tts_speed)를 여기에 곱한다
 SUPERTONIC_BASE_SPEED = 1.05
 
+# Supertonic은 Edge 음성보다 6dB쯤 작게 나와서(-26.5 vs -20 LUFS) 배경음악에 묻힌다. 같은 크기로 키운다
+SUPERTONIC_GAIN_DB = 6.5
+
 _supertonic_model = None
 _supertonic_lock = threading.Lock()
 
@@ -168,16 +171,31 @@ async def generate_supertonic_speech(
     style_name: str,
     speed: float,
 ) -> AudioAsset:
-    """Supertonic 로컬 모델로 WAV(44.1kHz 모노)를 만든다."""
+    """Supertonic 로컬 모델로 WAV(44.1kHz 모노)를 만들고, Edge 음성과 같은 크기로 키운다."""
+
+    raw_path = output_path.with_suffix(".raw.wav")
 
     try:
-        await asyncio.to_thread(_synthesize_supertonic, narration, output_path, style_name, speed)
+        await asyncio.to_thread(_synthesize_supertonic, narration, raw_path, style_name, speed)
+        await run_ffmpeg(
+            [
+                FFMPEG_BIN, "-y", "-i", str(raw_path),
+                "-af", f"volume={SUPERTONIC_GAIN_DB}dB,alimiter=limit=0.95:level=false",
+                "-c:a", "pcm_s16le",
+                str(output_path),
+            ],
+            timeout_sec=60,
+            failure_message="Supertonic 음량 조정 실패",
+        )
         duration_sec = await asyncio.to_thread(get_wav_duration, output_path)
         return AudioAsset(path=str(output_path), duration_sec=duration_sec)
 
     except Exception as exc:
         output_path.unlink(missing_ok=True)
         raise TTSGenerationError("Supertonic 음성 생성에 실패했습니다.") from exc
+
+    finally:
+        raw_path.unlink(missing_ok=True)
 
 
 # --------------------------------------------------

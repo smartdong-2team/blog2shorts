@@ -26,7 +26,7 @@ export const NO_MUSIC = 'none'
 /** 기본 배경음악. 음원 파일은 저장소에 없어서, 서버에 파일이 없으면 '배경음악 없음'으로 바뀐다 */
 export const DEFAULT_MUSIC = 'salsa_new_york'
 
-export const DEFAULT_AUDIO: AudioSettings = { voice: 'edge_injoon', music: DEFAULT_MUSIC, music_volume: 30 }
+export const DEFAULT_AUDIO: AudioSettings = { voice: 'edge_injoon', music: DEFAULT_MUSIC, music_volume: 20 }
 
 const labelOf = (options: { value: string; label: string }[], value: string) =>
   options.find((o) => o.value === value)?.label ?? value
