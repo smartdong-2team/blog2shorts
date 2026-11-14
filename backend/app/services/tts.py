@@ -51,11 +51,15 @@ async def generate_speech(
     narration: str,
     output_dir: Path,
     voice: str = "alloy",
+    speed: float | None = None,
 ) -> AudioAsset:
     """내레이션을 WAV 파일로 생성하고 실제 길이를 반환한다.
 
     voice는 화면의 선택값(edge_injoon, calm_female 등)이나 OpenAI 음성 이름(alloy 등)이다.
+    speed는 빠르기 배율이고, 없으면 설정값(TTS_SPEED)을 쓴다.
     """
+
+    speed = get_settings().tts_speed if speed is None else speed
 
     if not narration.strip():
         raise ValueError("내레이션이 비어 있습니다.")
@@ -64,10 +68,10 @@ async def generate_speech(
     output_path = output_dir / f"{uuid4().hex}.wav"
 
     if voice in EDGE_VOICES:
-        return await generate_edge_speech(narration, output_path, EDGE_VOICES[voice])
+        return await generate_edge_speech(narration, output_path, EDGE_VOICES[voice], speed)
 
     if voice in SUPERTONIC_VOICES:
-        return await generate_supertonic_speech(narration, output_path, SUPERTONIC_VOICES[voice])
+        return await generate_supertonic_speech(narration, output_path, SUPERTONIC_VOICES[voice], speed)
 
     voice = OPENAI_VOICES.get(voice, voice)
     client = get_openai_client()
@@ -78,7 +82,7 @@ async def generate_speech(
             voice=voice,
             input=narration,
             response_format="wav",
-            speed=get_settings().tts_speed,
+            speed=speed,
         ) as response:
             await response.stream_to_file(output_path)
 
@@ -106,6 +110,7 @@ async def generate_edge_speech(
     narration: str,
     output_path: Path,
     edge_voice: str,
+    speed: float,
 ) -> AudioAsset:
     """Edge 음성으로 MP3를 받아 다른 음성과 같은 WAV(24kHz 모노)로 바꾼다."""
 
@@ -114,7 +119,7 @@ async def generate_edge_speech(
     mp3_path = output_path.with_suffix(".mp3")
 
     try:
-        rate = f"{round((get_settings().tts_speed - 1) * 100):+d}%"
+        rate = f"{round((speed - 1) * 100):+d}%"
         await edge_tts.Communicate(narration, edge_voice, rate=rate).save(str(mp3_path))
         await run_ffmpeg(
             [
@@ -136,7 +141,7 @@ async def generate_edge_speech(
         mp3_path.unlink(missing_ok=True)
 
 
-def _synthesize_supertonic(narration: str, output_path: Path, style_name: str) -> None:
+def _synthesize_supertonic(narration: str, output_path: Path, style_name: str, speed: float) -> None:
     """Supertonic으로 WAV를 만든다. 모델은 한 번만 불러 쓰고, 동시에 한 장면씩만 합성한다."""
 
     global _supertonic_model
@@ -152,7 +157,7 @@ def _synthesize_supertonic(narration: str, output_path: Path, style_name: str) -
             narration,
             voice_style=style,
             lang="ko",
-            speed=SUPERTONIC_BASE_SPEED * get_settings().tts_speed,
+            speed=SUPERTONIC_BASE_SPEED * speed,
         )
         _supertonic_model.save_audio(wav, str(output_path))
 
@@ -161,11 +166,12 @@ async def generate_supertonic_speech(
     narration: str,
     output_path: Path,
     style_name: str,
+    speed: float,
 ) -> AudioAsset:
     """Supertonic 로컬 모델로 WAV(44.1kHz 모노)를 만든다."""
 
     try:
-        await asyncio.to_thread(_synthesize_supertonic, narration, output_path, style_name)
+        await asyncio.to_thread(_synthesize_supertonic, narration, output_path, style_name, speed)
         duration_sec = await asyncio.to_thread(get_wav_duration, output_path)
         return AudioAsset(path=str(output_path), duration_sec=duration_sec)
 
