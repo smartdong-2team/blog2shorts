@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { ApiError } from '../../api/client'
+import { listMusic } from '../../api/audio'
 import { cancelVideo, getVideoStatus, videoDownloadUrl } from '../../api/videos'
+import { DEFAULT_MUSIC, NO_MUSIC } from '../audio/options'
 
 // 스크립트 생성을 위한 백엔드 API 연결
 import { generateScript } from '../../api/scripts'
@@ -51,6 +53,22 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     stateRef.current = state
   })
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  // 기본 배경음악 파일이 서버에 없으면 '배경음악 없음'으로 바꾼다 (없는 곡으로 요청하면 영상 생성이 실패한다)
+  useEffect(() => {
+    const controller = new AbortController()
+    const fallBack = () => {
+      if (stateRef.current.audio.music === DEFAULT_MUSIC) dispatch({ type: 'audio', patch: { music: NO_MUSIC } })
+    }
+    listMusic(controller.signal)
+      .then(({ tracks }) => {
+        if (!tracks.some((track) => track.id === DEFAULT_MUSIC)) fallBack()
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) fallBack()
+      })
+    return () => controller.abort()
+  }, [])
 
   const running = state.phase === 'analyzing' || state.phase === 'rendering'
   const now = useNow(running)
