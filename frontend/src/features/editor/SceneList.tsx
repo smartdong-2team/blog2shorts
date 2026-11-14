@@ -44,7 +44,7 @@ export function SceneList({ state, dispatch, locked, bulk }: SceneListProps) {
           onChange={(event) => dispatch({ type: 'hookText', hookText: event.target.value })}
         />
         <Text variant="caption" tone="muted">
-          {hookText.length}/40자
+          {hookText.length}/40자 · 강조할 말은 *로 감싸요 (예: *3과목* 공부 순서)
         </Text>
       </div>
 

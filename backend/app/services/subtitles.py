@@ -364,13 +364,65 @@ def split_into_pages(text: str) -> list[list[str]]:
     return pages
 
 
+# 제목에서 강조할 부분을 감싸는 표시. 예: 둘째 줄이 '*3과목* 공부 순서'면 3과목을 강조한다
+EMPHASIS_MARK = "*"
+
+
+def normalize_emphasis(text: str) -> str:
+    """짝이 맞지 않는 마지막 강조 표시는 지운다."""
+
+    if text.count(EMPHASIS_MARK) % 2 == 0:
+        return text
+
+    index = text.rindex(EMPHASIS_MARK)
+    return text[:index] + text[index + 1:]
+
+
+def strip_emphasis(text: str) -> str:
+    """강조 표시를 뺀, 화면에 실제로 보이는 글자."""
+
+    return text.replace(EMPHASIS_MARK, "")
+
+
+def emphasis_segments(lines: list[str]) -> list[list[tuple[str, bool]]]:
+    """줄마다 (글자, 강조 여부) 조각으로 나눈다. 강조가 줄을 넘어가도 이어진다.
+
+    강조 조각 앞뒤 공백은 강조 밖으로 뺀다 (배경 상자가 공백까지 덮지 않게).
+    """
+
+    result = []
+    emphasized = False
+
+    for line in lines:
+        segments: list[tuple[str, bool]] = []
+
+        for index, part in enumerate(line.split(EMPHASIS_MARK)):
+            if index > 0:
+                emphasized = not emphasized
+            if not part:
+                continue
+            if emphasized:
+                core = part.strip()
+                lead = part[: len(part) - len(part.lstrip())]
+                trail = part[len(part.rstrip()):]
+                for text, flag in ((lead, False), (core, True), (trail, False)):
+                    if text:
+                        segments.append((text, flag))
+            else:
+                segments.append((part, False))
+
+        result.append(segments)
+
+    return result
+
+
 def layout_hook(text: str) -> tuple[list[str], int]:
     """제목을 최대 두 줄로 나누고, 폭에 맞는 글자 크기를 정한다.
 
     직접 넣은 줄바꿈은 지키고(세 줄 이상이면 둘째 줄로 합침), 없으면 균형 있게 나눈다.
     """
 
-    rows = [row.strip() for row in text.splitlines() if row.strip()]
+    rows = [row.strip() for row in normalize_emphasis(text).splitlines() if strip_emphasis(row).strip()]
 
     if not rows:
         return [], HOOK_MAX_FONT_SIZE
@@ -382,7 +434,7 @@ def layout_hook(text: str) -> tuple[list[str], int]:
 
     # 자막 글꼴 크기로 잰 폭을 제목 크기로 환산한다
     base_size = SUBTITLE_STYLES["default"]["font_size"]
-    widest_at_one = max(text_width(line) for line in lines) / base_size
+    widest_at_one = max(text_width(strip_emphasis(line)) for line in lines) / base_size
     fontsize = int(HOOK_MAX_WIDTH / widest_at_one)
 
     return lines, max(HOOK_MIN_FONT_SIZE, min(HOOK_MAX_FONT_SIZE, fontsize))
@@ -392,7 +444,7 @@ def _balance_hook_line(text: str) -> list[str]:
     """한 줄 제목을 두 줄 폭이 가장 비슷해지도록 나눈다."""
 
     words = text.split()
-    single_width = text_width(text)
+    single_width = text_width(strip_emphasis(text))
     base_size = SUBTITLE_STYLES["default"]["font_size"]
 
     # 가장 큰 글자로도 한 줄에 들어가면 나누지 않는다
@@ -407,7 +459,7 @@ def _balance_hook_line(text: str) -> list[str]:
     return list(
         min(
             candidates,
-            key=lambda pair: abs(text_width(pair[0]) - text_width(pair[1])),
+            key=lambda pair: abs(text_width(strip_emphasis(pair[0])) - text_width(strip_emphasis(pair[1]))),
         )
     )
 

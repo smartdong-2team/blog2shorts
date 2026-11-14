@@ -137,7 +137,7 @@ def rule_metrics(output: dict) -> dict:
     narrations = [scene["narration"] for scene in scenes]
     joined = " ".join(narrations)
     sentences = [s for text in narrations for s in sentences_of(text)]
-    hook_text = output.get("hook_text", "")
+    hook_text = output.get("hook_text", "").replace("*", "")  # 강조 표시는 글자 수에서 뺀다
     first_sentence = sentences_of(narrations[0])[0] if narrations and narrations[0] else ""
 
     return {
