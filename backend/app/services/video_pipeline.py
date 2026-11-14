@@ -14,7 +14,7 @@ from app.services.audio_pipeline import generate_scene_audio
 from app.services.music import NO_MUSIC, find_track, music_gain
 from app.services.storage import get_asset
 from app.services.subtitles import create_narration_cues
-from app.services.tts import DEFAULT_VOICE, OPENAI_VOICES
+from app.services.tts import DEFAULT_VOICE
 from app.services.video_render import render_video
 
 
@@ -81,7 +81,7 @@ async def generate_video(
     audio_result = await generate_scene_audio(
         scenes=request.scenes,
         output_dir=work_dir / "audio",
-        voice=OPENAI_VOICES[request.voice or DEFAULT_VOICE],
+        voice=request.voice or DEFAULT_VOICE,
         on_scene_done=lambda done, total: report("tts", done, TTS_WEIGHT * done / total),
     )
 

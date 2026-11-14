@@ -203,3 +203,67 @@ async def test_generate_speech_cleans_up_partial_file(tmp_path):
 
     assert list(tmp_path.glob("*.wav")) == []
     client.close.assert_awaited_once()
+
+
+# --------------------------------------------------
+# Edge 음성
+# --------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_speech_uses_edge_for_edge_voice(tmp_path):
+    from app.services import tts
+
+    saved = {}
+
+    class FakeCommunicate:
+        def __init__(self, text, voice):
+            saved.update(text=text, voice=voice)
+
+        async def save(self, path):
+            Path(path).write_bytes(b"mp3")
+
+    async def fake_ffmpeg(command, timeout_sec, failure_message):
+        create_test_wav(Path(command[-1]), duration_sec=1.5)
+
+    fake_module = MagicMock(Communicate=FakeCommunicate)
+
+    with (
+        patch.dict("sys.modules", {"edge_tts": fake_module}),
+        patch.object(tts, "run_ffmpeg", side_effect=fake_ffmpeg),
+        patch.object(tts, "get_openai_client") as openai_client,
+    ):
+        result = await generate_speech("안녕하세요", tmp_path, voice="edge_injoon")
+
+    assert saved == {"text": "안녕하세요", "voice": "ko-KR-InJoonNeural"}
+    assert result.duration_sec == pytest.approx(1.5)
+    openai_client.assert_not_called()
+    # 중간 MP3는 지운다
+    assert list(tmp_path.glob("*.mp3")) == []
+
+
+@pytest.mark.asyncio
+async def test_generate_speech_maps_app_voice_to_openai(tmp_path):
+    client = mock_openai_client()
+
+    with patch("app.services.tts.get_openai_client", return_value=client):
+        await generate_speech("안녕하세요", tmp_path, voice="calm_female")
+
+    call_kwargs = client.audio.speech.with_streaming_response.create.call_args.kwargs
+    assert call_kwargs["voice"] == "shimmer"
+
+
+@pytest.mark.asyncio
+async def test_edge_failure_raises_tts_error(tmp_path):
+    from app.services import tts
+
+    class BrokenCommunicate:
+        def __init__(self, text, voice):
+            pass
+
+        async def save(self, path):
+            raise ConnectionError("막힘")
+
+    with patch.dict("sys.modules", {"edge_tts": MagicMock(Communicate=BrokenCommunicate)}):
+        with pytest.raises(TTSGenerationError):
+            await tts.generate_speech("안녕하세요", tmp_path, voice="edge_sunhi")
+
+    assert list(tmp_path.iterdir()) == []

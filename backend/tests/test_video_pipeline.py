@@ -113,7 +113,7 @@ async def test_generate_video(monkeypatch, tmp_path):
     assert cues[-1].end_sec == pytest.approx(3.0)
 
     # 목소리를 지정하지 않으면 기본 목소리를 사용한다
-    assert mock_audio.await_args.kwargs["voice"] == "shimmer"
+    assert mock_audio.await_args.kwargs["voice"] == "edge_injoon"
 
     # TTS 파이프라인이 호출되었는지 확인
     mock_audio.assert_awaited_once()
