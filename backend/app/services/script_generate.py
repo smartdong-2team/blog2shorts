@@ -23,7 +23,7 @@ from app.schemas.script import (
 )
 from app.services.script_prompts import SCRIPT_INSTRUCTIONS_BY_STYLE
 from app.services.storage import get_asset
-from app.services.subtitles import clean_subtitle_pages, split_into_pages
+from app.services.subtitles import clean_subtitle_pages, ensure_hook_emphasis, split_into_pages
 
 logger = logging.getLogger(__name__)
 
@@ -177,9 +177,12 @@ def build_retry_messages(
 
 
 def normalize_ai_output(ai_output: ScriptOutputFormat) -> dict:
-    """AI 출력의 말투와 자막 나누기를 교정한 dict를 돌려준다. 검증 전에 쓴다."""
+    """AI 출력의 말투, 자막 나누기, 제목 강조를 교정한 dict를 돌려준다. 검증 전에 쓴다."""
 
     output = ai_output.model_dump()
+
+    # 제목 강조(*)를 빠뜨렸으면 아랫줄 전체를 강조한다
+    output["hook_text"] = ensure_hook_emphasis(output["hook_text"])
 
     for scene in output["scenes"]:
         scene["narration"] = normalize_narration_style(scene["narration"])

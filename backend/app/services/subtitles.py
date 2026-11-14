@@ -384,6 +384,27 @@ def strip_emphasis(text: str) -> str:
     return text.replace(EMPHASIS_MARK, "")
 
 
+def ensure_hook_emphasis(text: str, max_length: int = 40) -> str:
+    """AI가 제목에 강조를 넣지 않았으면 아랫줄 전체를 강조한다.
+
+    한 줄 제목은 영상과 같은 규칙으로 두 줄로 나눈 뒤 아랫줄을 강조한다.
+    한 줄로 들어가는 짧은 제목이나, 표시를 넣으면 max_length를 넘는 제목은 그대로 둔다.
+    """
+
+    text = normalize_emphasis(text)
+
+    if EMPHASIS_MARK in text:
+        return text
+
+    lines, _ = layout_hook(text)
+
+    if len(lines) < 2:
+        return text
+
+    emphasized = "\n".join([*lines[:-1], f"{EMPHASIS_MARK}{lines[-1]}{EMPHASIS_MARK}"])
+    return emphasized if len(emphasized) <= max_length else text
+
+
 def emphasis_segments(lines: list[str]) -> list[list[tuple[str, bool]]]:
     """줄마다 (글자, 강조 여부) 조각으로 나눈다. 강조가 줄을 넘어가도 이어진다.
 
