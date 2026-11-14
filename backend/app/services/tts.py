@@ -7,6 +7,7 @@ from uuid import uuid4
 from app.core.config import get_settings
 from app.core.openai import get_openai_client
 from app.schemas.audio import AudioAsset
+from app.services.speech_text import to_spoken_korean
 from app.services.video_render import FFMPEG_BIN, run_ffmpeg
 
 # 화면의 목소리 선택값 → OpenAI TTS 음성
@@ -66,6 +67,9 @@ async def generate_speech(
 
     if not narration.strip():
         raise ValueError("내레이션이 비어 있습니다.")
+
+    # 숫자는 한글 발음으로 바꿔 읽힌다 (288,000원 → 이십팔만팔천원). 화면 자막은 그대로다
+    narration = to_spoken_korean(narration)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{uuid4().hex}.wav"
