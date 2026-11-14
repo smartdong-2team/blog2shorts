@@ -58,7 +58,10 @@ class _Responses:
         input: list[dict],
         text_format: type[BaseModel],
         temperature: float | None = None,
+        json_schema: dict | None = None,
     ) -> SimpleNamespace:
+        """json_schema를 주면 text_format 대신 그 스키마로 출력을 묶는다 (값 목록 제한 등)."""
+
         messages = [{"role": "system", "content": instructions}] + [
             {"role": message["role"], "content": to_chat_content(message["content"])} for message in input
         ]
@@ -69,7 +72,7 @@ class _Responses:
             max_tokens=4000,
             response_format={
                 "type": "json_schema",
-                "json_schema": {"name": text_format.__name__, "schema": text_format.model_json_schema()},
+                "json_schema": {"name": text_format.__name__, "schema": json_schema or text_format.model_json_schema()},
             },
             # 생각 과정을 출력하지 않게 해 JSON만 받는다
             extra_body={"chat_template_kwargs": {"enable_thinking": False}},

@@ -105,3 +105,13 @@ def test_get_script_client_follows_provider_setting(provider, model):
 
     assert client is (nvidia_client if provider == "nvidia" else openai_client)
     assert chosen == model
+
+
+def test_script_schema_limits_asset_id_to_given_images():
+    schema = script_generate.script_schema_with_image_ids(["a", "b"])
+    asset_id = schema["$defs"]["ScriptOutputScene"]["properties"]["asset_id"]
+
+    assert asset_id == {"anyOf": [{"enum": ["a", "b"]}, {"type": "null"}]}
+    # 원래 스키마는 그대로 둔다
+    assert "anyOf" in ScriptOutputFormat.model_json_schema()["$defs"]["ScriptOutputScene"]["properties"]["asset_id"]
+    assert "enum" not in str(ScriptOutputFormat.model_json_schema()["$defs"]["ScriptOutputScene"]["properties"]["asset_id"])

@@ -13,7 +13,7 @@ from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 from openai import APIConnectionError, APITimeoutError, InternalServerError
 from app.core.config import get_settings
-from app.core.nvidia import get_nvidia_client
+from app.core.nvidia import NvidiaClient, get_nvidia_client
 from app.core.openai import get_openai_client
 from app.schemas.script import (
     ScriptAIOutput,
@@ -53,6 +53,19 @@ SENTENCE_END = r"(?=[.!?…,\"'\s]|$)"
 
 class ScriptGenerationError(Exception):
     """대본 생성에 최종적으로 실패한 경우."""
+
+
+def script_schema_with_image_ids(image_ids: list[str]) -> dict:
+    """asset_id를 실제 이미지 ID(또는 null)만 고를 수 있게 묶은 출력 스키마.
+
+    NVIDIA 모델은 긴 UUID를 베끼다 글자를 틀리는 일이 잦아, 출력 단계에서 값을 제한한다.
+    """
+
+    schema = ScriptOutputFormat.model_json_schema()
+    schema["$defs"]["ScriptOutputScene"]["properties"]["asset_id"] = {
+        "anyOf": [{"enum": image_ids}, {"type": "null"}] if image_ids else [{"type": "null"}],
+    }
+    return schema
 
 
 def get_script_client():
@@ -323,6 +336,11 @@ async def generate_script(
 
     user_content = await build_user_content(request)
     user_message = {"role": "user", "content": user_content}
+    extra_options = (
+        {"json_schema": script_schema_with_image_ids([image.asset_id for image in request.images])}
+        if isinstance(client, NvidiaClient)
+        else {}
+    )
     messages = [user_message]
 
     try:
@@ -337,6 +355,7 @@ async def generate_script(
                     instructions=SCRIPT_INSTRUCTIONS_BY_STYLE[request.style],
                     input=messages,
                     text_format=ScriptOutputFormat,
+                    **extra_options,
                 )
 
                 ai_output = response.output_parsed
