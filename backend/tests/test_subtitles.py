@@ -591,3 +591,62 @@ def test_clean_subtitle_pages_rejects_short_second_line():
         "이해 어려우면 온라인 강의를 활용해보세요.",
     ) is None
 
+
+
+# --------------------------------------------------
+# 제목 강조 (*로 감싼 부분)
+# --------------------------------------------------
+from app.services.subtitles import emphasis_segments, layout_hook, normalize_emphasis, strip_emphasis  # noqa: E402
+
+
+def test_emphasis_segments_split_marked_words():
+    assert emphasis_segments(["행정사 1차", "*3과목* 공부 순서"]) == [
+        [("행정사 1차", False)],
+        [("3과목", True), (" 공부 순서", False)],
+    ]
+
+
+def test_emphasis_keeps_spaces_outside_box_and_continues_across_lines():
+    assert emphasis_segments(["시험 * 3과목", "순서* 끝"]) == [
+        [("시험 ", False), (" ", False), ("3과목", True)],
+        [("순서", True), (" 끝", False)],
+    ]
+
+
+def test_unpaired_mark_is_dropped():
+    assert normalize_emphasis("*3과목 공부") == "3과목 공부"
+    assert normalize_emphasis("*3과목* 공부*") == "*3과목* 공부"
+
+
+def test_layout_hook_measures_without_marks():
+    marked, size = layout_hook("행정사 1차\n*3과목* 공부 순서")
+    plain, plain_size = layout_hook("행정사 1차\n3과목 공부 순서")
+
+    assert [strip_emphasis(line) for line in marked] == plain
+    assert size == plain_size
+
+
+def test_missing_emphasis_highlights_bottom_line():
+    from app.services.subtitles import ensure_hook_emphasis
+
+    assert ensure_hook_emphasis("행정사 1차 시험\n3과목으로 준비하세요") == "행정사 1차 시험\n*3과목으로 준비하세요*"
+    # 이미 강조가 있으면 그대로
+    assert ensure_hook_emphasis("행정사 1차\n*3과목* 출제") == "행정사 1차\n*3과목* 출제"
+
+
+def test_missing_emphasis_on_one_line_title_uses_video_line_split():
+    from app.services.subtitles import ensure_hook_emphasis
+
+    long_title = "행정사 1차 시험과목부터 기출문제까지 공부방법"
+    lines, _ = layout_hook(long_title)
+    assert len(lines) == 2
+    assert ensure_hook_emphasis(long_title) == f"{lines[0]}\n*{lines[1]}*"
+    # 한 줄로 들어가는 짧은 제목은 그대로
+    assert ensure_hook_emphasis("행정사") == "행정사"
+
+
+def test_missing_emphasis_keeps_length_limit():
+    from app.services.subtitles import ensure_hook_emphasis
+
+    title = "가" * 19 + "\n" + "나" * 19  # 39자
+    assert ensure_hook_emphasis(title) == title

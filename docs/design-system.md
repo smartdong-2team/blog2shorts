@@ -159,6 +159,12 @@ CSS 변수로 정의한다. 컴포넌트 CSS만 토큰을 직접 참조하고, �
 - 모양: 회색 트랙 안에 붙은 버튼, 선택 항목은 검정 배경·흰 글자. 따로 떨어진 `Tabs`와 구분된다
 - 규칙: `role="radiogroup"`/`role="radio"`, 키보드 ←/→ 이동. 진행 중에는 `disabled`
 
+### RadioGroup
+- 용도: 이름표와 설명이 필요한 하나 고르기 (대본 스타일: 숏츠 / 정보 전달)
+- props: `label`(화면에 보이는 이름표), `items: { value; label; description? }[]`, `value`, `onChange(value)`, `disabled?`
+- 모양: 이름표 회색 600, 항목은 18px 원 + 굵은 라벨 + 회색 설명. 선택되면 검정 테두리에 검정 점. 좁으면 줄바꿈
+- 규칙: `fieldset`/`legend`와 기본 라디오라 키보드 ←/→가 그대로 된다. 오른쪽 위 `SegmentedControl`(진행 방식)과 겹치지 않게 입력창 아래에 둔다
+
 ### Select
 - 용도: 목록에서 하나 고르기 (장면 움직임, 목소리, 배경음악)
 - props: `options: { value; label }[]`, `label?`, `ariaLabel?`(label 없을 때 필수), 기본 select 속성

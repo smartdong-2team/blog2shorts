@@ -7,8 +7,8 @@ from typing import Callable
 import os
 
 
-from app.services.subtitle_styles import SUBTITLE_STYLES
-from app.services.subtitles import SUBTITLE_MAX_WIDTH, layout_hook, text_width
+from app.services.subtitle_styles import HOOK_HIGHLIGHT, SUBTITLE_STYLES
+from app.services.subtitles import SUBTITLE_MAX_WIDTH, emphasis_segments, layout_hook, text_width
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
 from app.schemas.video import (
@@ -284,22 +284,59 @@ def build_hook_filter(hook_text: str) -> str:
     font = escape_filter_value(str(font_file))
 
     filters = []
+    base_size = style["font_size"]
+    pad = HOOK_HIGHLIGHT["padding"]
 
-    for index, line in enumerate(lines):
+    # *로 감싼 부분은 노란 배경 상자에 어두운 글자로, 나머지는 흰 글자에 검은 테두리로 그린다.
+    # 조각마다 따로 그리므로 폭을 재서 줄 전체를 가운데 맞춘다.
+    # drawtext는 조각 앞뒤 공백을 그리지 않으므로, 공백은 글자에서 빼고 그 폭만큼 직접 띄운다
+    scale = fontsize / base_size
+    space = text_width(" ") * scale
+
+    for index, segments in enumerate(emphasis_segments(lines)):
         y = start_y + index * line_height
+        pieces = []
 
-        filters.append(
-            "drawtext="
-            f"fontfile='{font}':"
-            f"text='{escape_drawtext_value(line)}':"
-            "expansion=none:"
-            "fontcolor=white:"
-            f"fontsize={fontsize}:"
-            "borderw=4:"
-            "bordercolor=black:"
-            "x=(w-text_w)/2:"
-            f"y={y}"
-        )
+        for text, emphasized in segments:
+            core = text.strip()
+            lead = (len(text) - len(text.lstrip())) * space
+            trail = (len(text) - len(text.rstrip())) * space
+            core_width = text_width(core) * scale + (pad * 2 if emphasized and core else 0)
+            pieces.append((core, emphasized, lead, core_width, trail))
+
+        total = sum(lead + core_width + trail for _, _, lead, core_width, trail in pieces)
+        offset = 0.0
+
+        for core, emphasized, lead, core_width, trail in pieces:
+            offset += lead
+            if not core:
+                offset += core_width + trail
+                continue
+
+            x = f"(w-{total:.1f})/2+{offset + (pad if emphasized else 0):.1f}"
+            width = core_width + trail
+            drawtext = (
+                "drawtext="
+                f"fontfile='{font}':"
+                f"text='{escape_drawtext_value(core)}':"
+                "expansion=none:"
+                f"fontsize={fontsize}:"
+                f"x={x}:"
+                f"y={y}:"
+            )
+
+            if emphasized:
+                drawtext += (
+                    f"fontcolor={HOOK_HIGHLIGHT['color']}:"
+                    "box=1:"
+                    f"boxcolor={HOOK_HIGHLIGHT['background_color']}:"
+                    f"boxborderw={pad}"
+                )
+            else:
+                drawtext += "fontcolor=white:borderw=4:bordercolor=black"
+
+            filters.append(drawtext)
+            offset += width
 
     return ",".join(filters)
 

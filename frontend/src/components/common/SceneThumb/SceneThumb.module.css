@@ -115,6 +115,18 @@
     0 2px 3px #000;
 }
 
+.hookLine {
+  display: block;
+}
+
+/* *로 감싼 강조 부분: 영상과 같은 노란 배경에 어두운 글자 (backend HOOK_HIGHLIGHT) */
+.hookEmphasis {
+  padding: 0 0.15em;
+  color: #111;
+  background: #ffe45c;
+  text-shadow: none;
+}
+
 /* 실제 영상의 자막 위치(세로 1270/1920). 입력한 줄 그대로 표시하고, 글자 크기는 hookLayout이 정한다 */
 .subtitle {
   position: absolute;
