@@ -27,3 +27,13 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+# onnxruntime(supertonic 의존성)은 1.24부터 Intel Mac용 wheel이 없다.
+# Intel Mac에서만 1.23.x로 묶고, 다른 환경은 최신 버전을 그대로 쓴다.
+[tool.uv]
+constraint-dependencies = [
+    "onnxruntime<1.24; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
