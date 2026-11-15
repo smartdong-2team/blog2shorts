@@ -4,6 +4,13 @@ FONT_DIR = Path(__file__).resolve().parents[2] / "assets" / "fonts"
 
 FONT_SIZE = 60
 
+# 제목(hook_text)에서 *로 감싼 강조 부분: 노란 배경에 어두운 글자
+HOOK_HIGHLIGHT = {
+    "color": "#111111",
+    "background_color": "#FFE45C",
+    "padding": 12,
+}
+
 SUBTITLE_STYLES = {
     "default": {
         "font_file": FONT_DIR / "Pretendard-Black.otf",

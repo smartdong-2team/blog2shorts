@@ -916,3 +916,17 @@ def test_build_subtitle_filter_shrinks_long_edited_line():
     font_size = int(re.search(r"fontsize=(\d+)", result)[1])
 
     assert font_size < SUBTITLE_STYLES["default"]["font_size"]
+
+
+def test_hook_filter_draws_emphasis_on_box():
+    from app.services.video_render import build_hook_filter
+
+    filters = build_hook_filter("행정사 1차\n*3과목* 공부 순서").split(",drawtext=")
+
+    emphasized = [f for f in filters if "text='3과목'" in f]
+    plain = [f for f in filters if "공부 순서" in f]
+
+    assert len(emphasized) == 1 and "box=1" in emphasized[0] and "boxcolor=#FFE45C" in emphasized[0]
+    assert len(plain) == 1 and "box=1" not in plain[0] and "fontcolor=white" in plain[0]
+    # 강조 표시 글자는 화면에 나오지 않는다
+    assert "*" not in build_hook_filter("행정사 1차\n*3과목* 공부 순서")
