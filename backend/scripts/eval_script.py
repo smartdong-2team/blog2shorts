@@ -22,6 +22,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 from app.core.config import get_settings  # noqa: E402
+from app.core.nvidia import get_nvidia_client  # noqa: E402
 from app.core.openai import get_openai_client  # noqa: E402
 from app.schemas.script import (  # noqa: E402
     ScriptAIOutput,
@@ -34,6 +35,12 @@ from app.services.script_generate import (  # noqa: E402
     normalize_ai_output,
 )
 from app.services.script_prompts import SCRIPT_INSTRUCTIONS  # noqa: E402
+
+
+def make_client(args):
+    """--provider nvidia면 앱과 같은 NVIDIA 클라이언트(NVIDIA_API_KEY 필요)를 쓴다."""
+    return get_nvidia_client() if args.provider == "nvidia" else get_openai_client()
+
 
 EVAL_DIR = BACKEND_DIR / "eval"
 CACHE_DIR = EVAL_DIR / "cache"
@@ -130,7 +137,7 @@ def rule_metrics(output: dict) -> dict:
     narrations = [scene["narration"] for scene in scenes]
     joined = " ".join(narrations)
     sentences = [s for text in narrations for s in sentences_of(text)]
-    hook_text = output.get("hook_text", "")
+    hook_text = output.get("hook_text", "").replace("*", "")  # 강조 표시는 글자 수에서 뺀다
     first_sentence = sentences_of(narrations[0])[0] if narrations and narrations[0] else ""
 
     return {
@@ -342,7 +349,7 @@ async def run(args) -> None:
     (out_dir / "instructions.txt").write_text(instructions, encoding="utf-8")
 
     print(f"대본 {len(posts) * args.runs}개 생성 (모델 {args.model}, 채점 {'끔' if args.no_judge else args.judge_model})")
-    client = get_openai_client()
+    client = make_client(args)
     semaphore = asyncio.Semaphore(args.concurrency)
     try:
         records = await asyncio.gather(
@@ -374,7 +381,7 @@ async def rejudge(args) -> None:
         for record in records
     }
 
-    client = get_openai_client()
+    client = make_client(args)
     semaphore = asyncio.Semaphore(args.concurrency)
 
     async def one(record: dict) -> dict:
@@ -469,7 +476,7 @@ async def pairwise(args) -> None:
         for post_id in by_post
     }
 
-    client = get_openai_client()
+    client = make_client(args)
     semaphore = asyncio.Semaphore(args.concurrency)
 
     async def one(post_id: str, a: dict, b: dict) -> str:
@@ -503,8 +510,11 @@ def main() -> None:
     parser.add_argument("--label", help="결과 폴더 이름에 붙일 이름")
     parser.add_argument("--runs", type=int, default=3, help="글 하나당 생성 횟수")
     parser.add_argument("--limit", type=int, default=0, help="앞에서부터 글 N개만")
-    parser.add_argument("--model", default=get_settings().openai_script_model, help="대본 모델")
-    parser.add_argument("--judge-model", default="gpt-4.1", help="채점 모델")
+    parser.add_argument(
+        "--provider", choices=["openai", "nvidia"], default="openai", help="nvidia면 NVIDIA 무료 API로 생성·채점"
+    )
+    parser.add_argument("--model", help="대본 모델. 기본: openai는 .env 설정, nvidia는 Nemotron")
+    parser.add_argument("--judge-model", help="채점 모델. 기본: openai는 gpt-4.1, nvidia는 Nemotron")
     parser.add_argument("--no-judge", action="store_true", help="LLM 채점 생략 (규칙 지표만)")
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--refresh", action="store_true", help="저장해 둔 글을 다시 받기")
@@ -514,6 +524,10 @@ def main() -> None:
         "--pairwise", nargs=2, metavar=("OLD_DIR", "NEW_DIR"), help="두 결과 폴더의 대본을 같은 글끼리 맞대어 비교"
     )
     args = parser.parse_args()
+    settings = get_settings()
+    nvidia = args.provider == "nvidia"
+    args.model = args.model or (settings.nvidia_script_model if nvidia else settings.openai_script_model)
+    args.judge_model = args.judge_model or (settings.nvidia_script_model if nvidia else "gpt-4.1")
 
     if args.compare:
         compare(args.compare)

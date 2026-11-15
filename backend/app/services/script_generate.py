@@ -3,6 +3,7 @@
 
 import asyncio
 import base64
+import json
 import logging
 import re
 from io import BytesIO
@@ -12,6 +13,7 @@ from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 from openai import APIConnectionError, APITimeoutError, InternalServerError
 from app.core.config import get_settings
+from app.core.nvidia import NvidiaClient, get_nvidia_client
 from app.core.openai import get_openai_client
 from app.schemas.script import (
     ScriptAIOutput,
@@ -19,9 +21,9 @@ from app.schemas.script import (
     ScriptGenerateRequest,
     ScriptGenerateResponse,
 )
-from app.services.script_prompts import SCRIPT_INSTRUCTIONS
+from app.services.script_prompts import SCRIPT_INSTRUCTIONS_BY_STYLE
 from app.services.storage import get_asset
-from app.services.subtitles import clean_subtitle_pages, split_into_pages
+from app.services.subtitles import clean_subtitle_pages, ensure_hook_emphasis, split_into_pages
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,30 @@ SENTENCE_END = r"(?=[.!?…,\"'\s]|$)"
 
 class ScriptGenerationError(Exception):
     """대본 생성에 최종적으로 실패한 경우."""
+
+
+def script_schema_with_image_ids(image_ids: list[str]) -> dict:
+    """asset_id를 실제 이미지 ID(또는 null)만 고를 수 있게 묶은 출력 스키마.
+
+    NVIDIA 모델은 긴 UUID를 베끼다 글자를 틀리는 일이 잦아, 출력 단계에서 값을 제한한다.
+    """
+
+    schema = ScriptOutputFormat.model_json_schema()
+    schema["$defs"]["ScriptOutputScene"]["properties"]["asset_id"] = {
+        "anyOf": [{"enum": image_ids}, {"type": "null"}] if image_ids else [{"type": "null"}],
+    }
+    return schema
+
+
+def get_script_client():
+    """설정(SCRIPT_PROVIDER)에 따라 대본 생성 클라이언트와 모델을 고른다."""
+
+    settings = get_settings()
+
+    if settings.script_provider == "nvidia":
+        return get_nvidia_client(), settings.nvidia_script_model
+
+    return get_openai_client(), settings.openai_script_model
 
 
 def _has_final_consonant(char: str) -> bool:
@@ -102,10 +128,61 @@ def normalize_subtitle_pages(
     return cleaned
 
 
+def describe_failure(error: Exception) -> str:
+    """검증 실패 이유를 규칙과 실제 값으로 요약한다. 로그와 재시도 요청에 쓴다.
+
+    대본 내용은 넣지 않고 위치, 규칙, 길이만 남긴다.
+    """
+
+    if not isinstance(error, ValidationError):
+        return str(error)
+
+    reasons = []
+
+    for detail in error.errors():
+        location = ".".join(str(part) for part in detail["loc"]) or "script"
+        reason = f"{location}: {detail['msg']}"
+
+        if detail["type"] in ("string_too_long", "string_too_short") and isinstance(
+            detail.get("input"), str
+        ):
+            reason += f" (got {len(detail['input'])})"
+
+        reasons.append(reason)
+
+    return "; ".join(reasons)
+
+
+def build_retry_messages(
+    user_message: dict,
+    output: dict,
+    reason: str,
+) -> list[dict]:
+    """실패한 대본과 실패 이유를 붙여 다시 요청할 메시지를 만든다."""
+
+    return [
+        user_message,
+        {
+            "role": "assistant",
+            "content": json.dumps(output, ensure_ascii=False),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"방금 만든 대본이 검증에 실패했어: {reason}\n"
+                "이 문제를 고치고, 나머지 규칙도 지켜서 대본 전체를 다시 만들어."
+            ),
+        },
+    ]
+
+
 def normalize_ai_output(ai_output: ScriptOutputFormat) -> dict:
-    """AI 출력의 말투와 자막 나누기를 교정한 dict를 돌려준다. 검증 전에 쓴다."""
+    """AI 출력의 말투, 자막 나누기, 제목 강조를 교정한 dict를 돌려준다. 검증 전에 쓴다."""
 
     output = ai_output.model_dump()
+
+    # 제목 강조(*)를 빠뜨렸으면 아랫줄 전체를 강조한다
+    output["hook_text"] = ensure_hook_emphasis(output["hook_text"])
 
     for scene in output["scenes"]:
         scene["narration"] = normalize_narration_style(scene["narration"])
@@ -258,19 +335,30 @@ async def generate_script(
 ) -> ScriptGenerateResponse:
     """숏폼 대본을 생성하고 검증한 뒤 최종 응답을 반환한다."""
 
-    client = get_openai_client()
+    client, model = get_script_client()
 
     user_content = await build_user_content(request)
+    user_message = {"role": "user", "content": user_content}
+    extra_options = (
+        {"json_schema": script_schema_with_image_ids([image.asset_id for image in request.images])}
+        if isinstance(client, NvidiaClient)
+        else {}
+    )
+    messages = [user_message]
 
     try:
         for attempt in range(MAX_ATTEMPTS):
+            is_last = attempt == MAX_ATTEMPTS - 1
+            output = None
+
             try:
                 # 1. OpenAI 대본 생성
                 response = await client.responses.parse(
-                    model=get_settings().openai_script_model,
-                    instructions=SCRIPT_INSTRUCTIONS,
-                    input=[{"role": "user", "content": user_content}],
+                    model=model,
+                    instructions=SCRIPT_INSTRUCTIONS_BY_STYLE[request.style],
+                    input=messages,
                     text_format=ScriptOutputFormat,
+                    **extra_options,
                 )
 
                 ai_output = response.output_parsed
@@ -297,21 +385,37 @@ async def generate_script(
                     estimated_duration_sec=estimated_duration_sec,
                 )
 
+            except (ValidationError, ValueError) as error:
+                reason = describe_failure(error)
+                logger.warning(
+                    "대본 검증 실패 (%d/%d): %s",
+                    attempt + 1,
+                    MAX_ATTEMPTS,
+                    reason,
+                )
+
+                if is_last:
+                    raise ScriptGenerationError(
+                        "대본 생성 및 검증에 실패했습니다."
+                    ) from error
+
+                # 다음 요청에 실패한 대본과 이유를 붙여 고치게 한다 (#15)
+                if output is not None:
+                    messages = build_retry_messages(user_message, output, reason)
+
             except (
-                ValidationError,
-                ValueError,
                 APIConnectionError,
                 APITimeoutError,
                 InternalServerError,
             ) as error:
                 logger.warning(
-                    "대본 생성 실패 (%d/%d): %s",
+                    "대본 생성 요청 실패 (%d/%d): %s",
                     attempt + 1,
                     MAX_ATTEMPTS,
                     type(error).__name__,
                 )
 
-                if attempt == MAX_ATTEMPTS - 1:
+                if is_last:
                     raise ScriptGenerationError(
                         "대본 생성 및 검증에 실패했습니다."
                     ) from error

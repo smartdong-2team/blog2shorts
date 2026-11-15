@@ -128,7 +128,15 @@
 
 .textSubmit {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+/* 대본 스타일만 있을 때도 버튼은 오른쪽 끝에 */
+.textSubmit > :last-child {
+  margin-left: auto;
 }
 
 @media (max-width: 480px) {
