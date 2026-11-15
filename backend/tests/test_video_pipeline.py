@@ -18,13 +18,16 @@ from app.services import video_pipeline
 
 
 @pytest.mark.asyncio
-async def test_generate_video(monkeypatch, tmp_path):
+@pytest.mark.parametrize("logo", [None, True, False])
+async def test_generate_video(monkeypatch, tmp_path, logo):
     # 짧은 가짜 음성이라 30초 맞추기는 끈다 (아래 전용 테스트에서 본다)
     monkeypatch.setattr(video_pipeline, "MIN_VIDEO_SEC", 0)
     asset_id = uuid4()
     image_path = tmp_path / "image.jpg"
     image_path.write_bytes(b"fake-image")
 
+    # logo를 생략하면 로고를 넣는다
+    logo_field = {} if logo is None else {"logo": logo}
     request = VideoCreateRequest(
         scenes=[
             {
@@ -34,7 +37,8 @@ async def test_generate_video(monkeypatch, tmp_path):
                 "caption": "테스트 자막",
                 "asset_id": asset_id,
             }
-        ]
+        ],
+        **logo_field,
     )
 
     # 이미지 조회 모킹
@@ -108,6 +112,8 @@ async def test_generate_video(monkeypatch, tmp_path):
 
     assert len(render_request.scenes) == 1
     assert render_request.scenes[0].image_path == image_path
+    # 로고 선택이 렌더링 요청까지 그대로 간다
+    assert render_request.logo is (logo is not False)
     # 화면 자막은 음성과 같은 내레이션을 장면 기준 시간으로 표시한다
     cues = render_request.scenes[0].subtitles
     assert cues[0].text == "테스트 내레이션"

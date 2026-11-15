@@ -27,6 +27,14 @@ const STYLE_ITEMS: RadioItem<ScriptStyle>[] = [
   { value: 'info', label: '정보 전달', description: '숫자·사실 위주' },
 ]
 
+type LogoChoice = 'on' | 'off'
+
+/** 영상 아래 회사 로고 */
+const LOGO_ITEMS: RadioItem<LogoChoice>[] = [
+  { value: 'on', label: '넣기' },
+  { value: 'off', label: '빼기' },
+]
+
 const START_LABEL: Record<Mode, string> = {
   auto: '영상 제작',
   review: '장면 만들기',
@@ -52,6 +60,7 @@ export interface ContentInputHandle {
 export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: ContentInputFormProps) {
   const [kind, setKind] = useState<InputKind>('url')
   const [style, setStyle] = useState<ScriptStyle>('shorts')
+  const [logo, setLogo] = useState<LogoChoice>('on')
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -71,8 +80,10 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
     return null
   }
 
-  const begin = () =>
-    onStart(kind === 'url' ? { kind: 'url', url: url.trim(), style } : { kind: 'text', title, text, style })
+  const begin = () => {
+    const options = { style, logo: logo === 'on' }
+    onStart(kind === 'url' ? { kind: 'url', url: url.trim(), ...options } : { kind: 'text', title, text, ...options })
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -100,7 +111,10 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
   }
 
   const styleField = (
-    <RadioGroup label="대본 스타일" items={STYLE_ITEMS} value={style} onChange={setStyle} disabled={running} />
+    <div className={styles.options}>
+      <RadioGroup label="대본 스타일" items={STYLE_ITEMS} value={style} onChange={setStyle} disabled={running} />
+      <RadioGroup label="회사 로고" items={LOGO_ITEMS} value={logo} onChange={setLogo} disabled={running} />
+    </div>
   )
 
   return (

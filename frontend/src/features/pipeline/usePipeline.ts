@@ -186,7 +186,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     signal: AbortSignal,
     hookText: string,
   ) => {
-    const { audio } = stateRef.current
+    const { audio, logo } = stateRef.current
 
     const request = {
       scenes: scenes.map((scene, index) => ({
@@ -203,6 +203,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
       music: audio.music,
       music_volume: audio.music_volume,
       hook_text: hookText,
+      logo,
     }
 
     // 서버는 한 작업 안에서 음성(4단계) → 영상 합성(5단계)을 이어서 한다. 진행 상황은 상태 조회로 받는다
@@ -232,6 +233,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
     const signal = begin()
     const mode = stateRef.current.mode
     dispatch({ type: 'runStart', phase: 'analyzing' })
+    dispatch({ type: 'logo', logo: input.logo })
     try {
       const content = await step(
         1,

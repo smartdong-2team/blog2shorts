@@ -18,9 +18,10 @@ export interface StepState {
   endedAt?: number
 }
 
-/** 입력 글과 대본 스타일 */
+/** 입력 글, 대본 스타일, 회사 로고를 넣을지 */
 export type ContentInput = ({ kind: 'url'; url: string } | { kind: 'text'; title: string; text: string }) & {
   style: ScriptStyle
+  logo: boolean
 }
 
 export interface ContentImage {
