@@ -421,10 +421,12 @@ async def render_scene(
     output_path: Path,
     settings: VideoSettings | None = None,
     hook_text: str = "",
+    logo: bool = True,
 ) -> Path:
     """이미지·음성·훅·자막·로고를 합성하여 단일 장면 MP4를 생성한다.
 
     scene.subtitles의 시간은 장면 시작을 0으로 하는 장면 기준 시간이다.
+    logo가 False면 회사 로고를 넣지 않는다.
     """
 
     settings = settings or VideoSettings()
@@ -442,7 +444,7 @@ async def render_scene(
             f"음성 파일을 찾을 수 없습니다: {audio_path}"
         )
 
-    if not LOGO_PATH.is_file():
+    if logo and not LOGO_PATH.is_file():
         raise FileNotFoundError(
             f"로고 파일을 찾을 수 없습니다: {LOGO_PATH}"
         )
@@ -484,16 +486,26 @@ async def render_scene(
 
         image_filter = f"{image_filter},{subtitle_filter}"
 
-    # 로고추가하는 부분
-    filter_complex = (
-        f"[0:v]{image_filter}[base];"
-        "[2:v]format=rgba,scale=500:-1[logo];"
-        "[base][logo]overlay="
-        "x=(W-w)/2:"
-        "y=H-h-320:"
-        "format=auto,"
-        "format=yuv420p[outv]"
-    )
+    # 로고추가하는 부분 (로고를 빼면 입력도 받지 않는다)
+    if logo:
+        filter_complex = (
+            f"[0:v]{image_filter}[base];"
+            "[2:v]format=rgba,scale=500:-1[logo];"
+            "[base][logo]overlay="
+            "x=(W-w)/2:"
+            "y=H-h-320:"
+            "format=auto,"
+            "format=yuv420p[outv]"
+        )
+        logo_input = [
+            "-loop", "1",
+            "-framerate", str(settings.fps),
+            "-i", str(LOGO_PATH),
+        ]
+    else:
+        filter_complex = f"[0:v]{image_filter},format=yuv420p[outv]"
+        logo_input = []
+
     command = [
         FFMPEG_BIN,
         "-y",
@@ -503,9 +515,7 @@ async def render_scene(
         "-i", str(audio_path),
 
         # 로고 이미지 입력
-        "-loop", "1",
-        "-framerate", str(settings.fps),
-        "-i", str(LOGO_PATH),
+        *logo_input,
 
         "-filter_complex", filter_complex,
         "-map", "[outv]",
@@ -618,6 +628,7 @@ async def render_video(
                 output_path=scene_output,
                 settings=request.settings,
                 hook_text=request.hook_text,
+                logo=request.logo,
             )
 
             scene_paths.append(scene_output)

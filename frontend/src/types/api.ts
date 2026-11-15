@@ -98,6 +98,8 @@ export interface VideoCreateRequest {
   music: string
   music_volume: number
   hook_text?: string
+  /** 화면 아래 회사 로고. 생략하면 넣는다 */
+  logo?: boolean
 }
 
 export interface VideoCreateResponse {

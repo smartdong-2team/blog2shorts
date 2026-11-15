@@ -80,6 +80,8 @@ class VideoRenderRequest(BaseModel):
         max_length=40,
         description="영상 전체에 고정 표시할 훅 문구",
     )
+    # 화면 아래 회사 로고를 넣을지
+    logo: bool = True
 
     @model_validator(mode="after")
     def validate_scene_order(self):
@@ -152,6 +154,8 @@ class VideoCreateRequest(BaseModel):
     # 배경음악 곡 ID. "none"이면 배경음악 없음
     music: str = "none"
     music_volume: int = Field(default=20, ge=0, le=100)
+    # 화면 아래 회사 로고를 넣을지. 생략하면 넣는다
+    logo: bool = True
 
     @model_validator(mode="after")
     def validate_scenes(self):

@@ -159,6 +159,7 @@ async def generate_video(
             scenes=render_scenes,
             output_path=output_path,
             hook_text=request.hook_text,
+            logo=request.logo,
             music_path=music_path,
             music_gain=music_gain(request.music_volume),
         ),

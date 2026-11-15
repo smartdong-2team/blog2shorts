@@ -31,6 +31,8 @@ export interface PipelineState {
   content: Content | null
   summary: ScriptSummary | null
   hookText: string
+  /** 영상 아래에 회사 로고를 넣을지 (입력 화면에서 고른 값) */
+  logo: boolean
   scenes: Scene[]
   audio: AudioSettings
   result: RenderResult | null
@@ -53,6 +55,7 @@ export type PipelineAction =
   | { type: 'content'; content: Content }
   | { type: 'summary'; summary: ScriptSummary }
   | { type: 'hookText'; hookText: string }
+  | { type: 'logo'; logo: boolean }
   | { type: 'scenes'; scenes: Scene[] }
   | { type: 'rendered'; result: RenderResult; renderedWith: string; now: number }
   | { type: 'editScene'; index: number; patch: Partial<Omit<Scene, 'id' | 'role'>> }
@@ -90,6 +93,7 @@ export const initialPipeline: PipelineState = {
   content: null,
   summary: null,
   hookText: '',
+  logo: true,
   scenes: [],
   audio: DEFAULT_AUDIO,
   result: null,
@@ -208,6 +212,9 @@ export function pipelineReducer(state: PipelineState, action: PipelineAction): P
 
     case 'hookText':
       return { ...state, hookText: action.hookText }
+
+    case 'logo':
+      return { ...state, logo: action.logo }
 
     case 'scenes':
       return { ...state, scenes: assignRoles(action.scenes) }
