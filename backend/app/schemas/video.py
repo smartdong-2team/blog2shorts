@@ -30,11 +30,10 @@ Motion = Literal[
 ]
 
 Voice = Literal[
-    "edge_injoon",
-    "edge_sunhi",
-    "edge_hyunsu",
     "supertonic_male",
+    "supertonic_male_2",
     "supertonic_female",
+    "supertonic_female_2",
     "calm_female",
     "bright_female",
     "clear_male",
@@ -80,6 +79,8 @@ class VideoRenderRequest(BaseModel):
         max_length=40,
         description="영상 전체에 고정 표시할 훅 문구",
     )
+    # 화면 아래 회사 로고를 넣을지
+    logo: bool = True
 
     @model_validator(mode="after")
     def validate_scene_order(self):
@@ -120,8 +121,8 @@ class VideoSceneInput(BaseModel):
     narration: str = Field(min_length=1)
     caption: str = Field(min_length=1)
     asset_id: UUID
-    # 프론트엔드에서 선택한 모션
-    motion: Motion = "zoom_in"
+    # 프론트엔드에서 선택한 모션. 생략하면 장면 순서에 따라 섞는다
+    motion: Motion | None = None
     # AI가 나눈 자막(페이지별 줄 목록). 문구를 고쳤거나 비어 있으면 서버가 다시 나눈다
     subtitle_pages: list[list[str]] = Field(default_factory=list)
 
@@ -152,6 +153,8 @@ class VideoCreateRequest(BaseModel):
     # 배경음악 곡 ID. "none"이면 배경음악 없음
     music: str = "none"
     music_volume: int = Field(default=20, ge=0, le=100)
+    # 화면 아래 회사 로고를 넣을지. 생략하면 넣는다
+    logo: bool = True
 
     @model_validator(mode="after")
     def validate_scenes(self):

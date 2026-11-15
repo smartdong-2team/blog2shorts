@@ -128,7 +128,23 @@
 
 .textSubmit {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+/* 대본 스타일·회사 로고를 한 줄에. 좁으면 줄을 바꾼다 */
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-40);
+}
+
+/* 선택 칸만 있을 때도 버튼은 오른쪽 끝에 */
+.textSubmit > :last-child {
+  margin-left: auto;
 }
 
 @media (max-width: 480px) {

@@ -115,6 +115,18 @@
     0 2px 3px #000;
 }
 
+.hookLine {
+  display: block;
+}
+
+/* *로 감싼 강조 부분: 영상과 같은 노란 배경에 어두운 글자 (backend HOOK_HIGHLIGHT) */
+.hookEmphasis {
+  padding: 0 0.15em;
+  color: #111;
+  background: #ffe45c;
+  text-shadow: none;
+}
+
 /* 실제 영상의 자막 위치(세로 1270/1920). 입력한 줄 그대로 표시하고, 글자 크기는 hookLayout이 정한다 */
 .subtitle {
   position: absolute;
@@ -153,7 +165,7 @@
 
 
 
-/* 이미지 움직임 미리보기 */
+/* 이미지 움직임 미리보기. 영상의 켄 번즈와 같은 세기 (18% 확대, 좌우는 18% 확대 후 여백의 90% 이동) */
 
 .zoomIn {
   animation: zoomInPreview 4s linear forwards;
@@ -177,14 +189,14 @@
     transform: scale(1);
   }
   to {
-    transform: scale(1.2);
+    transform: scale(1.18);
   }
 }
 
 /* 축소 */
 @keyframes zoomOutPreview {
   from {
-    transform: scale(1.2);
+    transform: scale(1.18);
   }
   to {
     transform: scale(1);
@@ -194,20 +206,20 @@
 /* 왼쪽 이동 */
 @keyframes panLeftPreview {
   from {
-    transform: scale(1.2) translateX(6%);
+    transform: scale(1.18) translateX(6.9%);
   }
   to {
-    transform: scale(1.2) translateX(-6%);
+    transform: scale(1.18) translateX(-6.9%);
   }
 }
 
 /* 오른쪽 이동 */
 @keyframes panRightPreview {
   from {
-    transform: scale(1.2) translateX(-6%);
+    transform: scale(1.18) translateX(-6.9%);
   }
   to {
-    transform: scale(1.2) translateX(6%);
+    transform: scale(1.18) translateX(6.9%);
   }
 }
 

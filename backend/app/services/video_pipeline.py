@@ -17,7 +17,7 @@ from app.services.music import NO_MUSIC, find_track, music_gain
 from app.services.storage import get_asset
 from app.services.subtitles import create_narration_cues
 from app.services.tts import DEFAULT_VOICE
-from app.services.video_render import render_video
+from app.services.video_render import default_motion, render_video
 
 
 # 전체 진행률에서 단계별 비중(대략값). 장면 렌더링이 음성 생성보다 오래 걸린다
@@ -142,7 +142,7 @@ async def generate_video(
                     duration_sec=scene.audio.duration_sec,
                     subtitle_pages=original.subtitle_pages,
                 ),
-                motion=original.motion,
+                motion=original.motion or default_motion(original.order),
             )
         )
 
@@ -159,6 +159,7 @@ async def generate_video(
             scenes=render_scenes,
             output_path=output_path,
             hook_text=request.hook_text,
+            logo=request.logo,
             music_path=music_path,
             music_gain=music_gain(request.music_volume),
         ),

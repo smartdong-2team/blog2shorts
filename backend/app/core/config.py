@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     openai_script_model: str = "gpt-4.1-mini"
     openai_tts_model: str = "tts-1"
 
+    # 대본 생성 AI. nvidia면 NVIDIA 무료 API(build.nvidia.com)를 쓴다. 목소리는 화면에서 고른다
+    script_provider: Literal["openai", "nvidia"] = "openai"
+    nvidia_api_key: SecretStr | None = None
+    # 이미지 입력과 JSON 스키마 출력을 지원하는 모델이어야 한다
+    nvidia_script_model: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+
     # Supertonic 로컬 음성 모델 (supertonic-2: 빠름, supertonic-3: 31개 언어)
     supertonic_model: str = "supertonic-2"
 
