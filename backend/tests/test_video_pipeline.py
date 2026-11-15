@@ -112,6 +112,8 @@ async def test_generate_video(monkeypatch, tmp_path, logo):
 
     assert len(render_request.scenes) == 1
     assert render_request.scenes[0].image_path == image_path
+    # 움직임을 보내지 않으면 장면 순서에 따른 기본 움직임(1번 장면은 확대)
+    assert render_request.scenes[0].motion == "zoom_in"
     # 로고 선택이 렌더링 요청까지 그대로 간다
     assert render_request.logo is (logo is not False)
     # 화면 자막은 음성과 같은 내레이션을 장면 기준 시간으로 표시한다
@@ -121,7 +123,7 @@ async def test_generate_video(monkeypatch, tmp_path, logo):
     assert cues[-1].end_sec == pytest.approx(3.0)
 
     # 목소리를 지정하지 않으면 기본 목소리를 사용한다
-    assert mock_audio.await_args.kwargs["voice"] == "edge_injoon"
+    assert mock_audio.await_args.kwargs["voice"] == "supertonic_male"
 
     # TTS 파이프라인이 호출되었는지 확인
     mock_audio.assert_awaited_once()

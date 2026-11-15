@@ -172,14 +172,14 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
     { "order": 1, "role": "hook", "narration": "…", "caption": "…", "asset_id": "5b8e…", "subtitle_pages": [["1줄", "2줄"], ["다음 자막"]] }
   ],
   "hook_text": "…",
-  "voice": "edge_injoon",
+  "voice": "supertonic_male",
   "music": "none",
   "music_volume": 20,
   "logo": true
 }
 ```
 
-검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 Edge 음성 `edge_injoon` | `edge_sunhi` | `edge_hyunsu`(무료), Supertonic 로컬 음성 `supertonic_male` | `supertonic_female`(무료), OpenAI 음성 `calm_female` | `bright_female` | `clear_male` | `low_male`, 또는 `null`(기본 `edge_injoon`)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이고 기본 20이다. `subtitle_pages`는 생략할 수 있고, 내레이션과 글자가 맞으면 그대로 영상 자막으로 쓴다 (맞지 않으면 서버가 규칙으로 다시 나눈다). `hook_text`에서 `*`로 감싼 부분(예: 둘째 줄 `*3과목* 공부 순서`)은 노란 배경에 어두운 글자로 강조해 그린다. `logo`는 화면 아래 회사 로고(`assets/branding/company_logo.png`)를 넣을지이고, 생략하면 `true`다. 로고를 빼도 자막 위치는 그대로다.
+검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 Supertonic 로컬 음성 `supertonic_male` | `supertonic_male_2` | `supertonic_female` | `supertonic_female_2`(무료), OpenAI 음성 `calm_female` | `bright_female` | `clear_male` | `low_male`, 또는 `null`(기본 `supertonic_male`)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이고 기본 20이다. 장면의 `motion`은 `zoom_in` | `zoom_out` | `pan_left` | `pan_right`이고, 장면 내내 천천히 움직인다(켄 번즈). 생략하면 장면 순서대로 확대 → 왼쪽 → 축소 → 오른쪽을 돌려 쓴다. `subtitle_pages`는 생략할 수 있고, 내레이션과 글자가 맞으면 그대로 영상 자막으로 쓴다 (맞지 않으면 서버가 규칙으로 다시 나눈다). `hook_text`에서 `*`로 감싼 부분(예: 둘째 줄 `*3과목* 공부 순서`)은 노란 배경에 어두운 글자로 강조해 그린다. `logo`는 화면 아래 회사 로고(`assets/branding/company_logo.png`)를 넣을지이고, 생략하면 `true`다. 로고를 빼도 자막 위치는 그대로다.
 
 - Response `202`
 

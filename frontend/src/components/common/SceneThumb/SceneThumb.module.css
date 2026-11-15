@@ -165,7 +165,7 @@
 
 
 
-/* 이미지 움직임 미리보기 */
+/* 이미지 움직임 미리보기. 영상의 켄 번즈와 같은 세기 (18% 확대, 좌우는 18% 확대 후 여백의 90% 이동) */
 
 .zoomIn {
   animation: zoomInPreview 4s linear forwards;
@@ -189,14 +189,14 @@
     transform: scale(1);
   }
   to {
-    transform: scale(1.2);
+    transform: scale(1.18);
   }
 }
 
 /* 축소 */
 @keyframes zoomOutPreview {
   from {
-    transform: scale(1.2);
+    transform: scale(1.18);
   }
   to {
     transform: scale(1);
@@ -206,20 +206,20 @@
 /* 왼쪽 이동 */
 @keyframes panLeftPreview {
   from {
-    transform: scale(1.2) translateX(6%);
+    transform: scale(1.18) translateX(6.9%);
   }
   to {
-    transform: scale(1.2) translateX(-6%);
+    transform: scale(1.18) translateX(-6.9%);
   }
 }
 
 /* 오른쪽 이동 */
 @keyframes panRightPreview {
   from {
-    transform: scale(1.2) translateX(-6%);
+    transform: scale(1.18) translateX(-6.9%);
   }
   to {
-    transform: scale(1.2) translateX(6%);
+    transform: scale(1.18) translateX(6.9%);
   }
 }
 

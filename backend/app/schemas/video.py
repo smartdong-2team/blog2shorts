@@ -30,11 +30,10 @@ Motion = Literal[
 ]
 
 Voice = Literal[
-    "edge_injoon",
-    "edge_sunhi",
-    "edge_hyunsu",
     "supertonic_male",
+    "supertonic_male_2",
     "supertonic_female",
+    "supertonic_female_2",
     "calm_female",
     "bright_female",
     "clear_male",
@@ -122,8 +121,8 @@ class VideoSceneInput(BaseModel):
     narration: str = Field(min_length=1)
     caption: str = Field(min_length=1)
     asset_id: UUID
-    # 프론트엔드에서 선택한 모션
-    motion: Motion = "zoom_in"
+    # 프론트엔드에서 선택한 모션. 생략하면 장면 순서에 따라 섞는다
+    motion: Motion | None = None
     # AI가 나눈 자막(페이지별 줄 목록). 문구를 고쳤거나 비어 있으면 서버가 다시 나눈다
     subtitle_pages: list[list[str]] = Field(default_factory=list)
 

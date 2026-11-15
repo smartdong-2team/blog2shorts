@@ -981,3 +981,71 @@ def test_hook_filter_draws_emphasis_on_box():
     assert len(plain) == 1 and "box=1" not in plain[0] and "fontcolor=white" in plain[0]
     # 강조 표시 글자는 화면에 나오지 않는다
     assert "*" not in build_hook_filter("행정사 1차\n*3과목* 공부 순서")
+
+
+# ==========================================================
+# 켄 번즈 움직임
+# ==========================================================
+
+@pytest.mark.parametrize("motion", ["zoom_in", "zoom_out", "pan_left", "pan_right"])
+def test_motion_filter_moves_whole_scene_without_zoompan(motion):
+    """장면 끝 프레임까지 움직이고, 떨리는 zoompan 대신 perspective를 쓴다."""
+    from app.services.video_render import build_motion_filter
+
+    motion_filter = build_motion_filter(motion, duration_sec=5.0, fps=30)
+
+    assert "zoompan" not in motion_filter
+    assert "perspective=" in motion_filter
+    assert "eval=frame" in motion_filter
+    # 150프레임 장면이면 마지막 프레임(149)에서 진행이 1이 된다
+    assert "on/149" in motion_filter
+    # filter_complex 안이라 따옴표 안 식에 쉼표가 있으면 필터가 끊긴다
+    for quoted in re.findall(r"'([^']*)'", motion_filter):
+        assert "," not in quoted
+
+
+def test_motion_filter_rejects_unknown_motion():
+    from app.services.video_render import build_motion_filter
+
+    with pytest.raises(ValueError):
+        build_motion_filter("spin", duration_sec=3.0, fps=30)
+
+
+def test_default_motion_cycles_by_order():
+    """장면마다 같은 움직임이 되지 않게 순서대로 돌아가며 쓴다."""
+    from app.services.video_render import default_motion
+
+    assert [default_motion(order) for order in range(1, 6)] == [
+        "zoom_in",
+        "pan_left",
+        "zoom_out",
+        "pan_right",
+        "zoom_in",
+    ]
+
+
+@pytest.mark.skipif(shutil.which(FFMPEG_BIN) is None, reason="FFmpeg가 없음")
+@pytest.mark.parametrize("motion", ["zoom_in", "pan_left"])
+def test_motion_filter_runs_in_ffmpeg(tmp_path, motion):
+    """실제 FFmpeg에서 필터가 돌아가고 프레임마다 화면이 바뀐다."""
+    from app.services.video_render import build_motion_filter
+
+    image_path = tmp_path / "image.png"
+    subprocess.run(
+        [FFMPEG_BIN, "-loglevel", "error", "-y", "-f", "lavfi",
+         "-i", "testsrc2=s=800x600:d=1", "-frames:v", "1", str(image_path)],
+        check=True,
+    )
+    frames = tmp_path / "frames.raw"
+    subprocess.run(
+        [FFMPEG_BIN, "-loglevel", "error", "-y", "-loop", "1", "-framerate", "30",
+         "-i", str(image_path),
+         "-filter_complex", f"[0:v]{build_motion_filter(motion, 1.0, 30)}[out]",
+         "-map", "[out]", "-frames:v", "30", "-pix_fmt", "gray", "-f", "rawvideo", str(frames)],
+        check=True,
+    )
+    data = frames.read_bytes()
+    frame_size = 1080 * 780
+    assert len(data) == frame_size * 30
+    first, last = data[:frame_size], data[-frame_size:]
+    assert first != last

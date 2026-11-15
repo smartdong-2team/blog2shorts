@@ -341,21 +341,33 @@ def build_hook_filter(hook_text: str) -> str:
     return ",".join(filters)
 
 
+# 켄 번즈 강도: 확대·축소는 18%, 좌우 이동은 18% 확대한 뒤 남는 여백의 90%를 지나간다
+KEN_BURNS_ZOOM = 1.18
+KEN_BURNS_PAN_TRAVEL = 0.9
+
+# 장면 순서에 따라 돌아가며 쓰는 기본 움직임 (모든 장면이 같은 움직임이 되지 않게)
+MOTION_CYCLE = ("zoom_in", "pan_left", "zoom_out", "pan_right")
+
+
+def default_motion(order: int) -> str:
+    """장면 순서(1부터)에 맞는 기본 움직임."""
+
+    return MOTION_CYCLE[(order - 1) % len(MOTION_CYCLE)]
+
+
 # 모션 필터
 def build_motion_filter(
     motion: str,
     duration_sec: float,
     fps: int,
-    motion_duration_sec: float = 1.2,
 ) -> str:
-    """장면 시작 시 짧게 움직이고 마지막 위치에서 정지한다."""
+    """장면 내내 천천히 움직이는 켄 번즈 효과.
+
+    zoompan은 위치를 정수 픽셀로 잘라 프레임마다 떨린다. 대신 perspective로
+    잘라낼 사각형을 프레임마다 소수 좌표로 옮기고(보간), 2배 크기에서 줄여 선명하게 만든다.
+    """
 
     total_frames = max(1, round(duration_sec * fps))
-
-    motion_frames = max(
-        1,
-        min(round(motion_duration_sec * fps), total_frames - 1)
-    )
 
     work_width = IMAGE_WIDTH * 2
     work_height = IMAGE_HEIGHT * 2
@@ -367,49 +379,51 @@ def build_motion_filter(
         "setsar=1"
     )
 
-    # 0~1.2초 동안 0→1, 이후에는 1로 고정
-    progress = f"min(on/{motion_frames},1)"
+    # 장면 첫 프레임 0 → 마지막 프레임 1. 같은 속도로 끝까지 움직인다
+    # (filter_complex 안이라 쉼표가 들어가는 함수는 쓰지 않는다)
+    progress = f"(on/{max(1, total_frames - 1)})"
 
-    # 부드럽게 시작하고 멈추는 ease-in-out
-    eased = f"({progress}*{progress}*(3-2*{progress}))"
-
-    # 모션 강도 설정
-    ZOOM_AMOUNT = 0.06   # 확대·축소 6%
-    PAN_ZOOM = 1.08      # 좌우 이동 시 여백 확보용 확대
-    PAN_AMOUNT = 0.30    # 이동 가능한 범위의 30%만 이동
+    zoom_max = KEN_BURNS_ZOOM
+    travel = KEN_BURNS_PAN_TRAVEL
 
     if motion == "zoom_in":
-        zoom = f"1+{ZOOM_AMOUNT}*{eased}"
-        x = "iw/2-iw/zoom/2"
-        y = "ih/2-ih/zoom/2"
+        zoom = f"(1+{zoom_max - 1:.4f}*{progress})"
+        x_ratio = "0.5"
 
     elif motion == "zoom_out":
-        zoom = f"1+{ZOOM_AMOUNT}*(1-{eased})"
-        x = "iw/2-iw/zoom/2"
-        y = "ih/2-ih/zoom/2"
+        zoom = f"(1+{zoom_max - 1:.4f}*(1-{progress}))"
+        x_ratio = "0.5"
 
     elif motion == "pan_left":
-        zoom = str(PAN_ZOOM)
-        x = f"(iw-iw/zoom)*(0.5+{PAN_AMOUNT}/2-{PAN_AMOUNT}*{eased})"
-        y = "ih/2-ih/zoom/2"
+        # 사진이 왼쪽으로 흘러간다 (보이는 영역은 왼쪽 끝에서 오른쪽으로). 편집 화면 미리보기와 같은 방향
+        zoom = f"{zoom_max}"
+        x_ratio = f"(0.5-{travel / 2}+{travel}*{progress})"
 
     elif motion == "pan_right":
-        zoom = str(PAN_ZOOM)
-        x = f"(iw-iw/zoom)*(0.5-{PAN_AMOUNT}/2+{PAN_AMOUNT}*{eased})"
-        y = "ih/2-ih/zoom/2"
+        # 사진이 오른쪽으로 흘러간다
+        zoom = f"{zoom_max}"
+        x_ratio = f"(0.5+{travel / 2}-{travel}*{progress})"
 
     else:
         raise ValueError(f"지원하지 않는 모션: {motion}")
 
+    # 원본에서 잘라낼 사각형 (W, H는 입력 크기). 여백 중 x_ratio 위치, 세로는 가운데
+    width = f"(W/{zoom})"
+    height = f"(H/{zoom})"
+    left = f"((W-{width})*{x_ratio})"
+    top = f"((H-{height})/2)"
+    right = f"({left}+{width})"
+    bottom = f"({top}+{height})"
+
     return (
         f"{base},"
-        f"zoompan="
-        f"z='{zoom}':"
-        f"x='{x}':"
-        f"y='{y}':"
-        f"d=1:"
-        f"s={work_width}x{work_height}:"
-        f"fps={fps},"
+        "perspective="
+        f"x0='{left}':y0='{top}':"
+        f"x1='{right}':y1='{top}':"
+        f"x2='{left}':y2='{bottom}':"
+        f"x3='{right}':y3='{bottom}':"
+        "interpolation=linear:"
+        "eval=frame,"
         f"scale={IMAGE_WIDTH}:{IMAGE_HEIGHT}:flags=lanczos,"
         "setsar=1"
     )

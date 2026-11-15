@@ -206,41 +206,6 @@ async def test_generate_speech_cleans_up_partial_file(tmp_path):
     client.close.assert_awaited_once()
 
 
-# --------------------------------------------------
-# Edge 음성
-# --------------------------------------------------
-@pytest.mark.asyncio
-async def test_generate_speech_uses_edge_for_edge_voice(tmp_path):
-    from app.services import tts
-
-    saved = {}
-
-    class FakeCommunicate:
-        def __init__(self, text, voice, rate):
-            saved.update(text=text, voice=voice, rate=rate)
-
-        async def save(self, path):
-            Path(path).write_bytes(b"mp3")
-
-    async def fake_ffmpeg(command, timeout_sec, failure_message):
-        create_test_wav(Path(command[-1]), duration_sec=1.5)
-
-    fake_module = MagicMock(Communicate=FakeCommunicate)
-
-    with (
-        patch.dict("sys.modules", {"edge_tts": fake_module}),
-        patch.object(tts, "run_ffmpeg", side_effect=fake_ffmpeg),
-        patch.object(tts, "get_openai_client") as openai_client,
-    ):
-        result = await generate_speech("안녕하세요", tmp_path, voice="edge_injoon")
-
-    assert saved == {"text": "안녕하세요", "voice": "ko-KR-InJoonNeural", "rate": "+15%"}
-    assert result.duration_sec == pytest.approx(1.5)
-    openai_client.assert_not_called()
-    # 중간 MP3는 지운다
-    assert list(tmp_path.glob("*.mp3")) == []
-
-
 @pytest.mark.asyncio
 async def test_generate_speech_maps_app_voice_to_openai(tmp_path):
     client = mock_openai_client()
@@ -250,24 +215,6 @@ async def test_generate_speech_maps_app_voice_to_openai(tmp_path):
 
     call_kwargs = client.audio.speech.with_streaming_response.create.call_args.kwargs
     assert call_kwargs["voice"] == "shimmer"
-
-
-@pytest.mark.asyncio
-async def test_edge_failure_raises_tts_error(tmp_path):
-    from app.services import tts
-
-    class BrokenCommunicate:
-        def __init__(self, text, voice, rate):
-            pass
-
-        async def save(self, path):
-            raise ConnectionError("막힘")
-
-    with patch.dict("sys.modules", {"edge_tts": MagicMock(Communicate=BrokenCommunicate)}):
-        with pytest.raises(TTSGenerationError):
-            await tts.generate_speech("안녕하세요", tmp_path, voice="edge_sunhi")
-
-    assert list(tmp_path.iterdir()) == []
 
 
 # --------------------------------------------------
@@ -311,6 +258,36 @@ async def test_generate_speech_uses_supertonic_and_loads_model_once(tmp_path):
     assert model.model == "supertonic-2"
     assert model.last == ("다음 장면", "M1", "ko", round(1.05 * 1.15, 4))
     openai_client.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("voice", "style"),
+    [
+        ("supertonic_male", "M1"),
+        ("supertonic_male_2", "M3"),
+        ("supertonic_female", "F1"),
+        ("supertonic_female_2", "F2"),
+    ],
+)
+async def test_supertonic_voice_styles(tmp_path, voice, style):
+    """화면의 목소리마다 정해 둔 Supertonic 음색을 쓴다."""
+    from app.services import tts
+
+    with (
+        patch.dict("sys.modules", {"supertonic": MagicMock(TTS=FakeSupertonicTTS)}),
+        patch.object(tts, "_supertonic_model", None),
+    ):
+        await generate_speech("안녕하세요", tmp_path, voice=voice)
+        model = tts._supertonic_model
+
+    assert model.last[1] == style
+
+
+def test_default_voice_is_free_supertonic():
+    from app.services import tts
+
+    assert tts.DEFAULT_VOICE in tts.SUPERTONIC_VOICES
 
 
 @pytest.mark.asyncio
