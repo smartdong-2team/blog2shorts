@@ -30,6 +30,11 @@ Motion = Literal[
 ]
 
 Voice = Literal[
+    "edge_injoon",
+    "edge_sunhi",
+    "edge_hyunsu",
+    "supertonic_male",
+    "supertonic_female",
     "calm_female",
     "bright_female",
     "clear_male",
@@ -146,7 +151,7 @@ class VideoCreateRequest(BaseModel):
     voice: Voice | None = None
     # 배경음악 곡 ID. "none"이면 배경음악 없음
     music: str = "none"
-    music_volume: int = Field(default=30, ge=0, le=100)
+    music_volume: int = Field(default=20, ge=0, le=100)
 
     @model_validator(mode="after")
     def validate_scenes(self):

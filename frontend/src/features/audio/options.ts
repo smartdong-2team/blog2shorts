@@ -1,10 +1,16 @@
 import type { AudioSettings } from '../pipeline/types'
 
+// edge_*는 무료 Edge 음성, supertonic_*은 서버에서 도는 로컬 음성, 나머지는 OpenAI 음성(크레딧 필요)
 export const VOICE_OPTIONS = [
-  { value: 'calm_female', label: '차분한 여성' },
-  { value: 'bright_female', label: '밝은 여성' },
-  { value: 'clear_male', label: '또렷한 남성' },
-  { value: 'low_male', label: '낮은 남성' },
+  { value: 'edge_injoon', label: '인준 (남성)' },
+  { value: 'edge_sunhi', label: '선희 (여성)' },
+  { value: 'edge_hyunsu', label: '현수 (남성)' },
+  { value: 'supertonic_male', label: '로컬 남성 (Supertonic)' },
+  { value: 'supertonic_female', label: '로컬 여성 (Supertonic)' },
+  { value: 'calm_female', label: '차분한 여성 (OpenAI)' },
+  { value: 'bright_female', label: '밝은 여성 (OpenAI)' },
+  { value: 'clear_male', label: '또렷한 남성 (OpenAI)' },
+  { value: 'low_male', label: '낮은 남성 (OpenAI)' },
 ]
 
 export const MUSIC_OPTIONS = [
@@ -17,7 +23,10 @@ export const MUSIC_OPTIONS = [
 
 export const NO_MUSIC = 'none'
 
-export const DEFAULT_AUDIO: AudioSettings = { voice: 'calm_female', music: NO_MUSIC, music_volume: 30 }
+/** 기본 배경음악. 음원 파일은 저장소에 없어서, 서버에 파일이 없으면 '배경음악 없음'으로 바뀐다 */
+export const DEFAULT_MUSIC = 'salsa_new_york'
+
+export const DEFAULT_AUDIO: AudioSettings = { voice: 'edge_injoon', music: DEFAULT_MUSIC, music_volume: 20 }
 
 const labelOf = (options: { value: string; label: string }[], value: string) =>
   options.find((o) => o.value === value)?.label ?? value

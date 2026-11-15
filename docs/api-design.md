@@ -170,13 +170,13 @@ OpenAI 원문 메시지는 키 일부가 들어갈 수 있어 클라이언트에
     { "order": 1, "role": "hook", "narration": "…", "caption": "…", "asset_id": "5b8e…", "subtitle_pages": [["1줄", "2줄"], ["다음 자막"]] }
   ],
   "hook_text": "…",
-  "voice": "calm_female",
+  "voice": "edge_injoon",
   "music": "none",
-  "music_volume": 30
+  "music_volume": 20
 }
 ```
 
-검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 `calm_female` | `bright_female` | `clear_male` | `low_male` 또는 `null`(기본 목소리)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이다. `subtitle_pages`는 생략할 수 있고, 내레이션과 글자가 맞으면 그대로 영상 자막으로 쓴다 (맞지 않으면 서버가 규칙으로 다시 나눈다).
+검증 규칙은 4번의 장면 규칙과 같다. `asset_id`는 존재하는 asset이어야 한다. `voice`는 Edge 음성 `edge_injoon` | `edge_sunhi` | `edge_hyunsu`(무료), Supertonic 로컬 음성 `supertonic_male` | `supertonic_female`(무료), OpenAI 음성 `calm_female` | `bright_female` | `clear_male` | `low_male`, 또는 `null`(기본 `edge_injoon`)이다. `music`은 `none` 또는 `GET /audio/music`의 곡 ID이고, `music_volume`은 0~100이고 기본 20이다. `subtitle_pages`는 생략할 수 있고, 내레이션과 글자가 맞으면 그대로 영상 자막으로 쓴다 (맞지 않으면 서버가 규칙으로 다시 나눈다).
 
 - Response `202`
 

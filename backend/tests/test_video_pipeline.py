@@ -19,6 +19,8 @@ from app.services import video_pipeline
 
 @pytest.mark.asyncio
 async def test_generate_video(monkeypatch, tmp_path):
+    # 짧은 가짜 음성이라 30초 맞추기는 끈다 (아래 전용 테스트에서 본다)
+    monkeypatch.setattr(video_pipeline, "MIN_VIDEO_SEC", 0)
     asset_id = uuid4()
     image_path = tmp_path / "image.jpg"
     image_path.write_bytes(b"fake-image")
@@ -113,7 +115,7 @@ async def test_generate_video(monkeypatch, tmp_path):
     assert cues[-1].end_sec == pytest.approx(3.0)
 
     # 목소리를 지정하지 않으면 기본 목소리를 사용한다
-    assert mock_audio.await_args.kwargs["voice"] == "shimmer"
+    assert mock_audio.await_args.kwargs["voice"] == "edge_injoon"
 
     # TTS 파이프라인이 호출되었는지 확인
     mock_audio.assert_awaited_once()
@@ -246,6 +248,7 @@ async def test_generate_video_uses_ai_subtitle_pages(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_generate_video_reports_progress(monkeypatch, tmp_path):
+    monkeypatch.setattr(video_pipeline, "MIN_VIDEO_SEC", 0)
     asset_id = uuid4()
     request = VideoCreateRequest(
         scenes=[
@@ -255,7 +258,7 @@ async def test_generate_video_reports_progress(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(video_pipeline, "get_asset", Mock(return_value=Mock(path=tmp_path / "image.jpg")))
 
-    async def fake_audio(scenes, output_dir, voice, on_scene_done=None):
+    async def fake_audio(scenes, output_dir, voice, on_scene_done=None, speed=None):
         for done in (1, 2):
             on_scene_done(done, 2)
         return AudioGenerationResult(
@@ -297,3 +300,63 @@ async def test_generate_video_reports_progress(monkeypatch, tmp_path):
     progresses = [p.progress for p in reported]
     assert progresses == sorted(progresses)
     assert progresses[-1] == pytest.approx(0.95)
+
+
+# --------------------------------------------------
+# 30초 맞추기
+# --------------------------------------------------
+def audio_of(total_sec: float, asset_id, tmp_path) -> AudioGenerationResult:
+    path = tmp_path / f"{uuid4().hex}.wav"
+    path.write_bytes(b"wav")
+    return AudioGenerationResult(
+        scenes=[
+            SceneMedia(
+                order=1,
+                asset_id=str(asset_id),
+                audio=AudioAsset(path=str(path), duration_sec=total_sec),
+                subtitles=[SubtitleCue(text="자막", start_sec=0.0, end_sec=total_sec)],
+            )
+        ],
+        total_duration_sec=total_sec,
+    )
+
+
+async def run_with_audio(monkeypatch, tmp_path, results):
+    asset_id = uuid4()
+    request = VideoCreateRequest(
+        scenes=[{"order": 1, "role": "hook", "narration": "장면", "caption": "자막", "asset_id": asset_id}]
+    )
+    monkeypatch.setattr(video_pipeline, "get_asset", Mock(return_value=Mock(path=tmp_path / "image.jpg")))
+    monkeypatch.setattr(video_pipeline, "get_settings", Mock(return_value=Mock(tts_speed=1.2)))
+    outputs = [audio_of(sec, asset_id, tmp_path) for sec in results]
+    mock_audio = AsyncMock(side_effect=outputs)
+    monkeypatch.setattr(video_pipeline, "generate_scene_audio", mock_audio)
+    monkeypatch.setattr(video_pipeline, "render_video", AsyncMock(return_value=Mock()))
+
+    await video_pipeline.generate_video(request, tmp_path / "out.mp4", tmp_path)
+    return mock_audio, outputs
+
+
+@pytest.mark.asyncio
+async def test_short_video_is_remade_with_slower_voice(monkeypatch, tmp_path):
+    mock_audio, outputs = await run_with_audio(monkeypatch, tmp_path, [27.0, 31.0])
+
+    assert mock_audio.await_count == 2
+    # 27초 → 30.5초가 되도록 1.2배 × 27/30.5
+    assert mock_audio.await_args_list[1].kwargs["speed"] == pytest.approx(1.2 * 27 / 30.5)
+    # 처음 만든 음성 파일은 지운다
+    assert not Path(outputs[0].scenes[0].audio.path).exists()
+
+
+@pytest.mark.asyncio
+async def test_slower_voice_never_goes_below_normal_speed(monkeypatch, tmp_path):
+    mock_audio, _ = await run_with_audio(monkeypatch, tmp_path, [15.0, 18.0])
+
+    assert mock_audio.await_args_list[1].kwargs["speed"] == pytest.approx(1.0)
+
+
+@pytest.mark.asyncio
+async def test_long_enough_video_keeps_voice(monkeypatch, tmp_path):
+    mock_audio, _ = await run_with_audio(monkeypatch, tmp_path, [35.0])
+
+    assert mock_audio.await_count == 1

@@ -19,6 +19,7 @@ async def generate_scene_audio(
     output_dir: Path,
     voice: str = "alloy",
     on_scene_done: Callable[[int, int], None] | None = None,
+    speed: float | None = None,
 ) -> AudioGenerationResult:
     """여러 장면의 TTS 음성과 자막 타임라인을 생성한다."""
 
@@ -49,6 +50,7 @@ async def generate_scene_audio(
                 narration=scene.narration,
                 output_dir=output_dir,
                 voice=voice,
+                speed=speed,
             )
 
             audio_assets.append(audio)

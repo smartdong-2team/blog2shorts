@@ -1,11 +1,14 @@
 
 import asyncio
+import threading
 import wave
 from pathlib import Path
 from uuid import uuid4
 from app.core.config import get_settings
 from app.core.openai import get_openai_client
 from app.schemas.audio import AudioAsset
+from app.services.speech_text import to_spoken_korean
+from app.services.video_render import FFMPEG_BIN, run_ffmpeg
 
 # 화면의 목소리 선택값 → OpenAI TTS 음성
 OPENAI_VOICES = {
@@ -15,7 +18,31 @@ OPENAI_VOICES = {
     "low_male": "onyx",
 }
 
-DEFAULT_VOICE = "calm_female"
+# 화면의 목소리 선택값 → Microsoft Edge 음성 (edge-tts, 키 없이 무료)
+# 공식 API가 아니라 Edge '소리 내어 읽기' 서비스를 쓰므로 막히면 OpenAI 음성으로 바꿔야 한다
+EDGE_VOICES = {
+    "edge_injoon": "ko-KR-InJoonNeural",
+    "edge_sunhi": "ko-KR-SunHiNeural",
+    "edge_hyunsu": "ko-KR-HyunsuMultilingualNeural",
+}
+
+# 화면의 목소리 선택값 → Supertonic 로컬 음성 (키·비용 없음, 처음 쓸 때 모델을 내려받음)
+# 모델: OpenRAIL-M. 공식 저장소는 보관(개발 종료) 상태다
+SUPERTONIC_VOICES = {
+    "supertonic_male": "M1",
+    "supertonic_female": "F1",
+}
+
+DEFAULT_VOICE = "edge_injoon"
+
+# Supertonic의 기본 speed 값. 설정 속도(tts_speed)를 여기에 곱한다
+SUPERTONIC_BASE_SPEED = 1.05
+
+# Supertonic은 Edge 음성보다 6dB쯤 작게 나와서(-26.5 vs -20 LUFS) 배경음악에 묻힌다. 같은 크기로 키운다
+SUPERTONIC_GAIN_DB = 6.5
+
+_supertonic_model = None
+_supertonic_lock = threading.Lock()
 
 
 class TTSGenerationError(Exception):
@@ -28,15 +55,32 @@ async def generate_speech(
     narration: str,
     output_dir: Path,
     voice: str = "alloy",
+    speed: float | None = None,
 ) -> AudioAsset:
-    """내레이션을 WAV 파일로 생성하고 실제 길이를 반환한다."""
+    """내레이션을 WAV 파일로 생성하고 실제 길이를 반환한다.
+
+    voice는 화면의 선택값(edge_injoon, calm_female 등)이나 OpenAI 음성 이름(alloy 등)이다.
+    speed는 빠르기 배율이고, 없으면 설정값(TTS_SPEED)을 쓴다.
+    """
+
+    speed = get_settings().tts_speed if speed is None else speed
 
     if not narration.strip():
         raise ValueError("내레이션이 비어 있습니다.")
 
+    # 숫자는 한글 발음으로 바꿔 읽힌다 (288,000원 → 이십팔만팔천원). 화면 자막은 그대로다
+    narration = to_spoken_korean(narration)
+
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{uuid4().hex}.wav"
 
+    if voice in EDGE_VOICES:
+        return await generate_edge_speech(narration, output_path, EDGE_VOICES[voice], speed)
+
+    if voice in SUPERTONIC_VOICES:
+        return await generate_supertonic_speech(narration, output_path, SUPERTONIC_VOICES[voice], speed)
+
+    voice = OPENAI_VOICES.get(voice, voice)
     client = get_openai_client()
 
     try:
@@ -45,6 +89,7 @@ async def generate_speech(
             voice=voice,
             input=narration,
             response_format="wav",
+            speed=speed,
         ) as response:
             await response.stream_to_file(output_path)
 
@@ -66,6 +111,95 @@ async def generate_speech(
 
     finally:
         await client.close()
+
+
+async def generate_edge_speech(
+    narration: str,
+    output_path: Path,
+    edge_voice: str,
+    speed: float,
+) -> AudioAsset:
+    """Edge 음성으로 MP3를 받아 다른 음성과 같은 WAV(24kHz 모노)로 바꾼다."""
+
+    import edge_tts
+
+    mp3_path = output_path.with_suffix(".mp3")
+
+    try:
+        rate = f"{round((speed - 1) * 100):+d}%"
+        await edge_tts.Communicate(narration, edge_voice, rate=rate).save(str(mp3_path))
+        await run_ffmpeg(
+            [
+                FFMPEG_BIN, "-y", "-i", str(mp3_path),
+                "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le",
+                str(output_path),
+            ],
+            timeout_sec=60,
+            failure_message="Edge 음성 변환 실패",
+        )
+        duration_sec = await asyncio.to_thread(get_wav_duration, output_path)
+        return AudioAsset(path=str(output_path), duration_sec=duration_sec)
+
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        raise TTSGenerationError("Edge 음성 생성에 실패했습니다.") from exc
+
+    finally:
+        mp3_path.unlink(missing_ok=True)
+
+
+def _synthesize_supertonic(narration: str, output_path: Path, style_name: str, speed: float) -> None:
+    """Supertonic으로 WAV를 만든다. 모델은 한 번만 불러 쓰고, 동시에 한 장면씩만 합성한다."""
+
+    global _supertonic_model
+
+    with _supertonic_lock:
+        if _supertonic_model is None:
+            from supertonic import TTS
+
+            _supertonic_model = TTS(model=get_settings().supertonic_model, auto_download=True)
+
+        style = _supertonic_model.get_voice_style(voice_name=style_name)
+        wav, _ = _supertonic_model.synthesize(
+            narration,
+            voice_style=style,
+            lang="ko",
+            speed=SUPERTONIC_BASE_SPEED * speed,
+        )
+        _supertonic_model.save_audio(wav, str(output_path))
+
+
+async def generate_supertonic_speech(
+    narration: str,
+    output_path: Path,
+    style_name: str,
+    speed: float,
+) -> AudioAsset:
+    """Supertonic 로컬 모델로 WAV(44.1kHz 모노)를 만들고, Edge 음성과 같은 크기로 키운다."""
+
+    raw_path = output_path.with_suffix(".raw.wav")
+
+    try:
+        await asyncio.to_thread(_synthesize_supertonic, narration, raw_path, style_name, speed)
+        await run_ffmpeg(
+            [
+                FFMPEG_BIN, "-y", "-i", str(raw_path),
+                "-af", f"volume={SUPERTONIC_GAIN_DB}dB,alimiter=limit=0.95:level=false",
+                "-c:a", "pcm_s16le",
+                str(output_path),
+            ],
+            timeout_sec=60,
+            failure_message="Supertonic 음량 조정 실패",
+        )
+        duration_sec = await asyncio.to_thread(get_wav_duration, output_path)
+        return AudioAsset(path=str(output_path), duration_sec=duration_sec)
+
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        raise TTSGenerationError("Supertonic 음성 생성에 실패했습니다.") from exc
+
+    finally:
+        raw_path.unlink(missing_ok=True)
 
 
 # --------------------------------------------------
