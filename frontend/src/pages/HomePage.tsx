@@ -59,7 +59,7 @@ export function HomePage() {
       <RunProgress state={state} stepElapsed={stepElapsed} videoEta={videoEta()} />
 
       {state.content && (
-        <SplitLayout asideVisible={state.result != null} aside={<VideoPreview state={state} stale={stale} />}>
+        <SplitLayout asideVisible={state.result != null} aside={<VideoPreview state={state} stale={stale} onError={showToast} />}>
           {state.scenes.length > 0 ? (
             <EditorWorkspace
               state={state}

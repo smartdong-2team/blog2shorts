@@ -6,18 +6,20 @@ import { VideoPlayer } from '../../components/common/VideoPlayer'
 import { audioSummary } from '../audio/options'
 import type { PipelineState } from '../pipeline/pipelineReducer'
 import { formatSec } from '../pipeline/scenes'
+import { videoFileName } from './fileName'
 import { useVideoDownload } from './useVideoDownload'
 
 interface VideoPreviewProps {
   state: PipelineState
   /** 완성 후 장면·음성 설정을 바꿨는지 */
   stale: boolean
+  onError?: (message: string) => void
 }
 
 /** 5단계 결과. 편집 영역 오른쪽에 붙는 완성 영상 */
-export function VideoPreview({ state, stale }: VideoPreviewProps) {
+export function VideoPreview({ state, stale, onError }: VideoPreviewProps) {
   const { result, scenes, audio } = state
-  const { download, downloading } = useVideoDownload()
+  const { download, downloading } = useVideoDownload(onError)
   if (!result) return null
 
   return (
@@ -37,7 +39,7 @@ export function VideoPreview({ state, stale }: VideoPreviewProps) {
         )}
       </Stack>
       <Button
-        onClick={() => result.download_url && download(result.download_url)}
+        onClick={() => result.download_url && download(result.download_url, videoFileName(state.content?.title))}
         loading={downloading}
         disabled={!result.download_url}
       >
