@@ -173,6 +173,56 @@ async def test_render_scene_layout(tmp_path):
     assert "pad=1080:1920:0:580:black" in command_text
 
 
+async def _render_command(tmp_path: Path, **kwargs) -> list[str]:
+    """render_scene이 만든 FFmpeg 명령을 돌려준다."""
+
+    scene = make_scene(tmp_path)
+    output_path = tmp_path / "scene.mp4"
+    process = make_mock_process()
+
+    async def mock_exec(*command, **exec_kwargs):
+        output_path.write_bytes(b"fake mp4")
+        return process
+
+    with patch(
+        "app.services.video_render.asyncio.create_subprocess_exec",
+        side_effect=mock_exec,
+    ) as mock_subprocess:
+        await render_scene(scene, output_path, **kwargs)
+
+    return list(mock_subprocess.call_args.args)
+
+
+@pytest.mark.asyncio
+async def test_render_scene_adds_logo_by_default(tmp_path):
+    """기본값은 회사 로고를 입력으로 받아 화면 아래에 겹친다."""
+
+    from app.services.video_render import LOGO_PATH
+
+    command = await _render_command(tmp_path)
+
+    assert str(LOGO_PATH) in command
+    assert "[base][logo]overlay=" in " ".join(command)
+
+
+@pytest.mark.asyncio
+async def test_render_scene_without_logo(tmp_path, monkeypatch):
+    """logo=False면 로고 파일이 없어도 되고, 로고 입력과 겹치기가 빠진다."""
+
+    from app.services import video_render
+
+    missing = tmp_path / "no-logo.png"
+    monkeypatch.setattr(video_render, "LOGO_PATH", missing)
+
+    command = await _render_command(tmp_path, logo=False)
+    command_text = " ".join(command)
+
+    assert str(missing) not in command
+    assert "overlay" not in command_text
+    assert command.count("-i") == 2
+    assert "[outv]" in command_text
+
+
 # ==========================================================
 # 3. 입력 파일 검증 테스트
 # ==========================================================
@@ -587,6 +637,7 @@ async def test_render_video_multiple_scenes(tmp_path):
         output_path,
         settings=None,
         hook_text="",
+        logo=True,
     ):
         output_path.write_bytes(b"fake scene mp4")
         return output_path
@@ -916,6 +967,20 @@ def test_build_subtitle_filter_shrinks_long_edited_line():
     font_size = int(re.search(r"fontsize=(\d+)", result)[1])
 
     assert font_size < SUBTITLE_STYLES["default"]["font_size"]
+
+
+def test_hook_filter_draws_emphasis_on_box():
+    from app.services.video_render import build_hook_filter
+
+    filters = build_hook_filter("행정사 1차\n*3과목* 공부 순서").split(",drawtext=")
+
+    emphasized = [f for f in filters if "text='3과목'" in f]
+    plain = [f for f in filters if "공부 순서" in f]
+
+    assert len(emphasized) == 1 and "box=1" in emphasized[0] and "boxcolor=#FFE45C" in emphasized[0]
+    assert len(plain) == 1 and "box=1" not in plain[0] and "fontcolor=white" in plain[0]
+    # 강조 표시 글자는 화면에 나오지 않는다
+    assert "*" not in build_hook_filter("행정사 1차\n*3과목* 공부 순서")
 
 
 # ==========================================================

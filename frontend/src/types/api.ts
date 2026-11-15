@@ -21,11 +21,15 @@ export interface ScriptImage {
   alt: string | null
 }
 
+export type ScriptStyle = 'info' | 'shorts'
+
 export interface ScriptGenerateRequest {
   title?: string | null
   text: string
   images?: ScriptImage[]
   target_duration_sec?: number
+  /** 대본 스타일. info: 정보 전달, shorts: 숏츠 (기본) */
+  style?: ScriptStyle
 }
 
 export interface ScriptSummary {
@@ -94,6 +98,8 @@ export interface VideoCreateRequest {
   music: string
   music_volume: number
   hook_text?: string
+  /** 화면 아래 회사 로고. 생략하면 넣는다 */
+  logo?: boolean
 }
 
 export interface VideoCreateResponse {

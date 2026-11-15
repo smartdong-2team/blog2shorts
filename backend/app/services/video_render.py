@@ -7,8 +7,8 @@ from typing import Callable
 import os
 
 
-from app.services.subtitle_styles import SUBTITLE_STYLES
-from app.services.subtitles import SUBTITLE_MAX_WIDTH, layout_hook, text_width
+from app.services.subtitle_styles import HOOK_HIGHLIGHT, SUBTITLE_STYLES
+from app.services.subtitles import SUBTITLE_MAX_WIDTH, emphasis_segments, layout_hook, text_width
 from app.schemas.video import RenderScene, VideoSettings
 from app.schemas.audio import SubtitleCue
 from app.schemas.video import (
@@ -284,22 +284,59 @@ def build_hook_filter(hook_text: str) -> str:
     font = escape_filter_value(str(font_file))
 
     filters = []
+    base_size = style["font_size"]
+    pad = HOOK_HIGHLIGHT["padding"]
 
-    for index, line in enumerate(lines):
+    # *로 감싼 부분은 노란 배경 상자에 어두운 글자로, 나머지는 흰 글자에 검은 테두리로 그린다.
+    # 조각마다 따로 그리므로 폭을 재서 줄 전체를 가운데 맞춘다.
+    # drawtext는 조각 앞뒤 공백을 그리지 않으므로, 공백은 글자에서 빼고 그 폭만큼 직접 띄운다
+    scale = fontsize / base_size
+    space = text_width(" ") * scale
+
+    for index, segments in enumerate(emphasis_segments(lines)):
         y = start_y + index * line_height
+        pieces = []
 
-        filters.append(
-            "drawtext="
-            f"fontfile='{font}':"
-            f"text='{escape_drawtext_value(line)}':"
-            "expansion=none:"
-            "fontcolor=white:"
-            f"fontsize={fontsize}:"
-            "borderw=4:"
-            "bordercolor=black:"
-            "x=(w-text_w)/2:"
-            f"y={y}"
-        )
+        for text, emphasized in segments:
+            core = text.strip()
+            lead = (len(text) - len(text.lstrip())) * space
+            trail = (len(text) - len(text.rstrip())) * space
+            core_width = text_width(core) * scale + (pad * 2 if emphasized and core else 0)
+            pieces.append((core, emphasized, lead, core_width, trail))
+
+        total = sum(lead + core_width + trail for _, _, lead, core_width, trail in pieces)
+        offset = 0.0
+
+        for core, emphasized, lead, core_width, trail in pieces:
+            offset += lead
+            if not core:
+                offset += core_width + trail
+                continue
+
+            x = f"(w-{total:.1f})/2+{offset + (pad if emphasized else 0):.1f}"
+            width = core_width + trail
+            drawtext = (
+                "drawtext="
+                f"fontfile='{font}':"
+                f"text='{escape_drawtext_value(core)}':"
+                "expansion=none:"
+                f"fontsize={fontsize}:"
+                f"x={x}:"
+                f"y={y}:"
+            )
+
+            if emphasized:
+                drawtext += (
+                    f"fontcolor={HOOK_HIGHLIGHT['color']}:"
+                    "box=1:"
+                    f"boxcolor={HOOK_HIGHLIGHT['background_color']}:"
+                    f"boxborderw={pad}"
+                )
+            else:
+                drawtext += "fontcolor=white:borderw=4:bordercolor=black"
+
+            filters.append(drawtext)
+            offset += width
 
     return ",".join(filters)
 
@@ -398,10 +435,12 @@ async def render_scene(
     output_path: Path,
     settings: VideoSettings | None = None,
     hook_text: str = "",
+    logo: bool = True,
 ) -> Path:
     """이미지·음성·훅·자막·로고를 합성하여 단일 장면 MP4를 생성한다.
 
     scene.subtitles의 시간은 장면 시작을 0으로 하는 장면 기준 시간이다.
+    logo가 False면 회사 로고를 넣지 않는다.
     """
 
     settings = settings or VideoSettings()
@@ -419,7 +458,7 @@ async def render_scene(
             f"음성 파일을 찾을 수 없습니다: {audio_path}"
         )
 
-    if not LOGO_PATH.is_file():
+    if logo and not LOGO_PATH.is_file():
         raise FileNotFoundError(
             f"로고 파일을 찾을 수 없습니다: {LOGO_PATH}"
         )
@@ -461,16 +500,26 @@ async def render_scene(
 
         image_filter = f"{image_filter},{subtitle_filter}"
 
-    # 로고추가하는 부분
-    filter_complex = (
-        f"[0:v]{image_filter}[base];"
-        "[2:v]format=rgba,scale=500:-1[logo];"
-        "[base][logo]overlay="
-        "x=(W-w)/2:"
-        "y=H-h-320:"
-        "format=auto,"
-        "format=yuv420p[outv]"
-    )
+    # 로고추가하는 부분 (로고를 빼면 입력도 받지 않는다)
+    if logo:
+        filter_complex = (
+            f"[0:v]{image_filter}[base];"
+            "[2:v]format=rgba,scale=500:-1[logo];"
+            "[base][logo]overlay="
+            "x=(W-w)/2:"
+            "y=H-h-320:"
+            "format=auto,"
+            "format=yuv420p[outv]"
+        )
+        logo_input = [
+            "-loop", "1",
+            "-framerate", str(settings.fps),
+            "-i", str(LOGO_PATH),
+        ]
+    else:
+        filter_complex = f"[0:v]{image_filter},format=yuv420p[outv]"
+        logo_input = []
+
     command = [
         FFMPEG_BIN,
         "-y",
@@ -480,9 +529,7 @@ async def render_scene(
         "-i", str(audio_path),
 
         # 로고 이미지 입력
-        "-loop", "1",
-        "-framerate", str(settings.fps),
-        "-i", str(LOGO_PATH),
+        *logo_input,
 
         "-filter_complex", filter_complex,
         "-map", "[outv]",
@@ -595,6 +642,7 @@ async def render_video(
                 output_path=scene_output,
                 settings=request.settings,
                 hook_text=request.hook_text,
+                logo=request.logo,
             )
 
             scene_paths.append(scene_output)

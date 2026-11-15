@@ -1,9 +1,11 @@
 import { useId, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from 'react'
 import { Button } from '../../components/common/Button'
+import { RadioGroup, type RadioItem } from '../../components/common/RadioGroup'
 import { SegmentedControl, type SegmentItem } from '../../components/common/SegmentedControl'
 import { Tabs, type TabItem } from '../../components/common/Tabs'
 import { TextField } from '../../components/common/TextField'
 import { SAMPLE_URL } from '../pipeline/mockData'
+import type { ScriptStyle } from '../../types/api'
 import type { ContentInput, Mode } from '../pipeline/types'
 import styles from './ContentInputForm.module.css'
 
@@ -17,6 +19,20 @@ const INPUT_TABS: TabItem<InputKind>[] = [
 const MODE_ITEMS: SegmentItem<Mode>[] = [
   { value: 'auto', label: '자동 제작' },
   { value: 'review', label: '검토 후 제작' },
+]
+
+/** 대본 스타일. 숏츠는 질문형 첫 장면과 짧은 리듬, 정보 전달은 원문의 숫자·사실을 촘촘히 */
+const STYLE_ITEMS: RadioItem<ScriptStyle>[] = [
+  { value: 'shorts', label: '숏츠', description: '질문으로 시작, 빠른 리듬' },
+  { value: 'info', label: '정보 전달', description: '숫자·사실 위주' },
+]
+
+type LogoChoice = 'on' | 'off'
+
+/** 영상 아래 회사 로고 */
+const LOGO_ITEMS: RadioItem<LogoChoice>[] = [
+  { value: 'on', label: '넣기' },
+  { value: 'off', label: '빼기' },
 ]
 
 const START_LABEL: Record<Mode, string> = {
@@ -43,6 +59,8 @@ export interface ContentInputHandle {
 
 export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: ContentInputFormProps) {
   const [kind, setKind] = useState<InputKind>('url')
+  const [style, setStyle] = useState<ScriptStyle>('shorts')
+  const [logo, setLogo] = useState<LogoChoice>('on')
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -62,7 +80,10 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
     return null
   }
 
-  const begin = () => onStart(kind === 'url' ? { kind: 'url', url: url.trim() } : { kind: 'text', title, text })
+  const begin = () => {
+    const options = { style, logo: logo === 'on' }
+    onStart(kind === 'url' ? { kind: 'url', url: url.trim(), ...options } : { kind: 'text', title, text, ...options })
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -88,6 +109,13 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
     setKind(next)
     setError(null)
   }
+
+  const styleField = (
+    <div className={styles.options}>
+      <RadioGroup label="대본 스타일" items={STYLE_ITEMS} value={style} onChange={setStyle} disabled={running} />
+      <RadioGroup label="회사 로고" items={LOGO_ITEMS} value={logo} onChange={setLogo} disabled={running} />
+    </div>
+  )
 
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
@@ -156,6 +184,7 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
               {error}
             </p>
           )}
+          {styleField}
         </div>
       ) : (
         <div className={styles.textFields}>
@@ -177,6 +206,7 @@ export function ContentInputForm({ mode, onModeChange, onStart, running, ref }: 
             disabled={running}
           />
           <div className={styles.textSubmit}>
+            {styleField}
             <Button type="submit" className={styles.submit} disabled={running}>
               {START_LABEL[mode]}
             </Button>
