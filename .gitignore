@@ -26,3 +26,6 @@ backend/output/
 # 음원 원본은 라이선스상 저장소에 올리지 않는다 (backend/assets/music/README.md 참고)
 backend/assets/music/*
 !backend/assets/music/README.md
+# 대본 평가: 받아 둔 블로그 글과 실행 결과는 올리지 않는다 (backend/eval/README.md 참고)
+backend/eval/cache/
+backend/eval/results/

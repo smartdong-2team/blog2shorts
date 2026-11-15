@@ -102,6 +102,21 @@ def normalize_subtitle_pages(
     return cleaned
 
 
+def normalize_ai_output(ai_output: ScriptOutputFormat) -> dict:
+    """AI 출력의 말투와 자막 나누기를 교정한 dict를 돌려준다. 검증 전에 쓴다."""
+
+    output = ai_output.model_dump()
+
+    for scene in output["scenes"]:
+        scene["narration"] = normalize_narration_style(scene["narration"])
+        scene["subtitle_pages"] = normalize_subtitle_pages(
+            scene["subtitle_pages"],
+            scene["narration"],
+        )
+
+    return output
+
+
 # --------------------------------------------------
 # 1. AI에 보여줄 이미지 준비
 # --------------------------------------------------
@@ -264,16 +279,7 @@ async def generate_script(
                     raise ValueError("AI 대본 생성 결과가 없습니다.")
 
                 # 2. 말투 교정 (글자 수가 바뀌므로 검증 전에 수행)
-                output = ai_output.model_dump()
-
-                for scene in output["scenes"]:
-                    scene["narration"] = normalize_narration_style(
-                        scene["narration"]
-                    )
-                    scene["subtitle_pages"] = normalize_subtitle_pages(
-                        scene["subtitle_pages"],
-                        scene["narration"],
-                    )
+                output = normalize_ai_output(ai_output)
 
                 # 3. 비즈니스 규칙 검증
                 validated = ScriptAIOutput.model_validate(output)

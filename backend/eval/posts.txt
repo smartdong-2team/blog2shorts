@@ -1,0 +1,31 @@
+# 대본 평가에 쓰는 블로그 글. 한 줄에 주소 하나, #은 주석.
+# 같은 글로 프롬프트를 비교해야 하므로 함부로 바꾸지 말고, 바꾸면 이전 결과와 비교하지 않는다.
+
+# 자격증 합격률·난이도
+https://blog.naver.com/copper567/224453934072
+https://blog.naver.com/copper567/224446368589
+https://blog.naver.com/copper567/224440164047
+https://blog.naver.com/copper567/224438783179
+https://blog.naver.com/copper567/224434022666
+
+# 독학·공부 방법
+https://blog.naver.com/copper567/224467003660
+https://blog.naver.com/copper567/224458775976
+https://blog.naver.com/copper567/224412384155
+https://blog.naver.com/copper567/224407185222
+https://blog.naver.com/copper567/224418434055
+
+# 교재 소개
+https://blog.naver.com/copper567/224456421801
+https://blog.naver.com/copper567/224448778087
+https://blog.naver.com/copper567/224442374562
+https://blog.naver.com/copper567/224424557960
+
+# 합격 후기
+https://blog.naver.com/copper567/224464484776
+
+# 서비스 소개
+https://blog.naver.com/copper567/224471533780
+
+# 앱의 "예시 글"
+https://blog.naver.com/copper567/224443571088
