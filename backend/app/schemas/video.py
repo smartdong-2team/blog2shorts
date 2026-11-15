@@ -30,11 +30,10 @@ Motion = Literal[
 ]
 
 Voice = Literal[
-    "edge_injoon",
-    "edge_sunhi",
-    "edge_hyunsu",
     "supertonic_male",
+    "supertonic_male_2",
     "supertonic_female",
+    "supertonic_female_2",
     "calm_female",
     "bright_female",
     "clear_male",
