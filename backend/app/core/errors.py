@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.nvidia import NvidiaKeyMissingError
 from app.core.openai import OpenAIKeyMissingError
 from app.services.script_generate import ScriptGenerationError
 from app.services.tts import TTSGenerationError
@@ -132,6 +133,12 @@ def classify_error(exc: BaseException) -> AppError:
                 500,
                 "OPENAI_API_KEY_MISSING",
                 f"OpenAI API 키가 설정되지 않았습니다. {KEY_FIX_GUIDE}",
+            )
+        if isinstance(item, NvidiaKeyMissingError):
+            return AppError(
+                500,
+                "NVIDIA_API_KEY_MISSING",
+                "NVIDIA API 키가 설정되지 않았습니다. backend/.env에 NVIDIA_API_KEY를 넣거나 SCRIPT_PROVIDER=openai로 바꿔 주세요.",
             )
         if isinstance(item, openai.OpenAIError):
             return _classify_openai_error(item)

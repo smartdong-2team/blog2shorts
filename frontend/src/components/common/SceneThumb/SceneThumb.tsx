@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { layoutHook, subtitleFontSize } from './hookLayout'
+import { emphasisSegments, layoutHook, subtitleFontSize } from './hookLayout'
 import styles from './SceneThumb.module.css'
 import type { Motion } from '../../../features/pipeline/types'
 
@@ -43,7 +43,15 @@ export function SceneThumb({
       >
         {hook.text && (
           <span className={styles.hookText} style={{ fontSize: hook.fontSize }}>
-            {hook.text}
+            {emphasisSegments(hook.lines).map((segments, row) => (
+              <span key={row} className={styles.hookLine}>
+                {segments.map((segment, index) => (
+                  <span key={index} className={segment.emphasized ? styles.hookEmphasis : undefined}>
+                    {segment.text}
+                  </span>
+                ))}
+              </span>
+            ))}
           </span>
         )}
 

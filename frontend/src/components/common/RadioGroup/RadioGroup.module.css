@@ -1,0 +1,89 @@
+/* fieldset 기본 테두리를 지우고 이름표와 항목을 한 줄로 */
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-18);
+  min-width: 0;
+  margin: 0;
+  padding: 0 var(--space-6);
+  border: 0;
+}
+
+.group:disabled {
+  opacity: var(--opacity-disabled);
+}
+
+/* legend는 flex 안에서 줄 맞춤이 안 되므로 float로 빼서 일반 요소처럼 둔다 */
+.legend {
+  float: left;
+  padding: 0;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-18);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.group:disabled .item {
+  cursor: default;
+}
+
+/* 기본 라디오 대신 그린 원. 선택되면 검정 테두리 안에 검정 점 */
+.input {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 50%;
+  background: var(--color-surface);
+  appearance: none;
+  cursor: inherit;
+}
+
+.input::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text);
+  transform: scale(0);
+  transition: transform 0.12s;
+}
+
+.input:checked {
+  border-color: var(--color-text);
+}
+
+.input:checked::after {
+  transform: scale(1);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.description {
+  color: var(--color-text-muted);
+}

@@ -256,6 +256,7 @@ export function usePipeline({ onError, onRunStart }: UsePipelineOptions) {
                 alt: image.alt,
               })),
               target_duration_sec: 45,
+              style: input.style,
             },
             signal,
           )
