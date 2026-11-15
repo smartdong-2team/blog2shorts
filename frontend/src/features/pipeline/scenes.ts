@@ -14,6 +14,12 @@ export const MOTION_OPTIONS: { value: Motion; label: string }[] = [
   { value: 'pan_right', label: '오른쪽 이동' },
 ]
 
+/** 장면 순서대로 돌아가며 쓰는 기본 움직임. 모든 장면이 같은 움직임이 되지 않게 섞는다 (서버 MOTION_CYCLE과 같은 순서) */
+const MOTION_CYCLE: Motion[] = ['zoom_in', 'pan_left', 'zoom_out', 'pan_right']
+
+/** index번째(0부터) 장면의 기본 움직임 */
+export const defaultMotion = (index: number): Motion => MOTION_CYCLE[index % MOTION_CYCLE.length]
+
 let seq = 0
 export const newSceneId = () => `scene-${Date.now().toString(36)}-${++seq}`
 
@@ -129,7 +135,7 @@ export function scriptIssue(blocks: string[][]) {
   return undefined
 }
 
-/** 고친 대본을 장면에 입힌다. i번째 장면은 기존 i번째 장면의 이미지·움직임을 쓰고, 새 장면은 앞 장면 이미지를 이어 쓴다 */
+/** 고친 대본을 장면에 입힌다. i번째 장면은 기존 i번째 장면의 이미지·움직임을 쓰고, 새 장면은 앞 장면 이미지를 이어 쓰고 움직임은 순서대로 섞는다 */
 export function applyScript(scenes: Scene[], blocks: string[][]): Scene[] {
   const next: Scene[] = []
   blocks.forEach((subtitles, index) => {
@@ -140,7 +146,7 @@ export function applyScript(scenes: Scene[], blocks: string[][]): Scene[] {
       role: base?.role ?? 'body',
       caption: base?.caption ?? '',
       asset_id: base ? base.asset_id : (previous?.asset_id ?? null),
-      motion: base?.motion ?? previous?.motion ?? 'zoom_in',
+      motion: base?.motion ?? defaultMotion(index),
       subtitles,
       narration: narrationFromSubtitles(subtitles),
     })

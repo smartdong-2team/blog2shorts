@@ -108,6 +108,8 @@ async def test_generate_video(monkeypatch, tmp_path):
 
     assert len(render_request.scenes) == 1
     assert render_request.scenes[0].image_path == image_path
+    # 움직임을 보내지 않으면 장면 순서에 따른 기본 움직임(1번 장면은 확대)
+    assert render_request.scenes[0].motion == "zoom_in"
     # 화면 자막은 음성과 같은 내레이션을 장면 기준 시간으로 표시한다
     cues = render_request.scenes[0].subtitles
     assert cues[0].text == "테스트 내레이션"
